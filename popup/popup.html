@@ -1,0 +1,36 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Map Review Extractor</title>
+    <style>
+        body { font-family: Arial, sans-serif; padding: 10px; width: 300px; }
+        button { padding: 10px 20px; font-size: 16px; cursor: pointer; margin-top: 10px; }
+        select, input[type="checkbox"] { font-size: 16px; margin-top: 10px; }
+    </style>
+</head>
+<body>
+    <h1>Map Review Extractor</h1>
+    
+    <label>
+        <input type="checkbox" id="allcommentsCheckbox" checked/>
+        Get all comments
+    </label>
+    
+    <div>
+        <label for="commentCount">Select number of comments:</label>
+        <select id="commentCount" disabled>
+            <option value="5">5</option>
+            <option value="10">10</option>
+            <option value="20">20</option>
+            <option value="50">50</option>
+            <option value="100">100</option>
+        </select>
+    </div>
+    
+    <button id="extractButton">Extract Reviews</button>
+    
+    <script src="popup.js"></script>
+</body>
+</html>
