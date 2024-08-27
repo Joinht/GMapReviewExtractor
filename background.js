@@ -62,12 +62,12 @@ function extractInformation(shouldExtractAllComments, commentCount) {
             });
 
             const webSite = document.querySelector('.rogA2c.ITvuef .fontBodyMedium')?.innerText || '';
-            const phoneNumber = document.querySelector('.AeaXub .rogA2c .fontBodyMedium')?.innerText || '';
+            const phoneNumber = document.querySelector('[data-item-id^="phone:tel:"]')?.querySelector('.Io6YTe.fontBodyMedium')?.innerText || '';
 
             return {currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber};
     }
 
-    async  function getComments(){
+    async function getComments(){
         
         // wait for the tab to be activate
         if(!document.querySelector('.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde')){
@@ -97,6 +97,26 @@ function extractInformation(shouldExtractAllComments, commentCount) {
         return reviews;
     }
 
+    async function getIntroduction(){
+        if(!document.querySelector('.hh2c6.G7m0Af')){
+            return;
+        }
+
+         // wait for the tab to be activate
+         const introductionClass ='.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde';
+         const introductionArea =document.querySelector(introductionClass);
+         if(!introductionArea){
+            await switchToTab(2, introductionClass); // Wait for the reviews container
+        }
+
+        const contents = introductionArea.querySelectorAll('.fontBodyMedium');
+        if(contents.length == 0){
+             return [];
+        }
+
+        
+    }
+
     function extractImages(el){
         // extract images
         const imageElements = el.querySelector('.KtCyie')?.childNodes;
@@ -116,6 +136,7 @@ function extractInformation(shouldExtractAllComments, commentCount) {
     async function main() {
         const { currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber } = await basicInfomation();
         const reviews = await getComments();
+        const introduction = await getIntroduction();
 
         console.log({ currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber, reviews });
     }
