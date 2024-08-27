@@ -1,16 +1,20 @@
-chrome.runtime.onMessage.addListener((request) => {
+chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     if (request.action === 'extractInfo') {
         chrome.scripting.executeScript({
             target: { tabId: request.tabId },
             func: extractInformation,
             args: [request.shouldExtractAllComments, request.commentCount]
+        }, (results) => {
+            // Send the result back to the popup.js
+            sendResponse(results[0].result); // results[0].result contains the returned value from extractInformation
         });
 
+        // Return true to indicate you want to send a response asynchronously
         return true;
     }
 });
 
-function extractInformation(shouldExtractAllComments, commentCount) {
+async function extractInformation(shouldExtractAllComments, commentCount) {
 
     const tabConstant = {
         general: 0,
@@ -148,12 +152,14 @@ function extractInformation(shouldExtractAllComments, commentCount) {
     }
 
     async function main() {
+
         const { currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber } = await generalInformation();
         const reviews = await getReviews();
         const introduction = await getIntroduction();
 
-        console.log({ currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber, reviews, introduction });
+        return { currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber, reviews, introduction };
     }
 
-    main();
+    const result = await main();
+    return result;
 }
