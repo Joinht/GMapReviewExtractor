@@ -11,6 +11,13 @@ chrome.runtime.onMessage.addListener((request) => {
 });
 
 function extractInformation(shouldExtractAllComments, commentCount) {
+
+    const tabConstant = {
+        general: 0,
+        review:1,
+        introduce: 2
+    }
+
     // Utility function to wait for an element to appear
     function waitForElement(selector, hasChild = false, timeout = 10000, interval = 100) {
         return new Promise((resolve, reject) => {
@@ -37,14 +44,15 @@ function extractInformation(shouldExtractAllComments, commentCount) {
         await waitForElement(waitForSelector);
     }
    
-    async function basicInfomation(){
+    async function generalInformation(){
            // wait for the tab to be activate
-            if(!document.querySelector('.DUwDvf.lfPIob')){
-                await switchToTab(0, '.DUwDvf.lfPIob'); // Wait for the location element
+           const generalElement = '.DUwDvf.lfPIob'
+            if(!document.querySelector(generalElement)){
+                await switchToTab(tabConstant.general, generalElement); // Wait for the location element
             }
             
             const currentUrl = window.location.href;
-            const location = document.querySelector(".DUwDvf.lfPIob")?.innerText
+            const location = document.querySelector(generalElement)?.innerText
             const thumbnail = document.querySelector(".RZ66Rb.FgCUCc img")?.src;
             const totalRating = document.querySelector(".F7nice span span")?.innerText ||  0;
 
@@ -56,8 +64,8 @@ function extractInformation(shouldExtractAllComments, commentCount) {
             let openingHours = [];
 
             openingHoursRows.forEach(row => {
-                const day = row.querySelector('td.ylH6lf div')?.innerText || 'Unknown Day';
-                const hours = row.querySelector('td.mxowUb li.G8aQO')?.innerText || 'Unknown Hours';
+                const day = row.querySelector('td.ylH6lf div')?.innerText || '';
+                const hours = row.querySelector('td.mxowUb li.G8aQO')?.innerText || '';
                 openingHours.push({ day, hours });
             });
 
@@ -67,18 +75,23 @@ function extractInformation(shouldExtractAllComments, commentCount) {
             return {currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber};
     }
 
-    async function getComments(){
-        
+    async function getReviews(){
+
         // wait for the tab to be activate
-        if(!document.querySelector('.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde')){
-            await switchToTab(1, '.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde'); // Wait for the reviews container
+        const reviewTab = document.querySelector('button[data-tab-index="1"]');
+        if(!reviewTab) return;
+
+        const reviewAreaElement = '.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde'
+        if (!reviewTab.classList.contains('G7m0Af')) {
+            await switchToTab(tabConstant.review, reviewAreaElement);
         }
 
         // wait for review list are display
-        await waitForElement('div[class="m6QErb XiKgde "]', true);
+        const reviewListElement = 'div[class="m6QErb XiKgde "]';
+        await waitForElement(reviewListElement, true);
 
         let reviews = [];
-        const reviewArea = document.querySelector(".m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde")?.querySelector('div[class="m6QErb XiKgde "]');
+        const reviewArea = document.querySelector(reviewAreaElement)?.querySelector(reviewListElement);
         var reviewNodes = reviewArea.querySelectorAll('.fontBodyMedium');
         const limit = shouldExtractAllComments ? reviewNodes.length : Math.min(reviewNodes.length, commentCount);
 
@@ -98,23 +111,24 @@ function extractInformation(shouldExtractAllComments, commentCount) {
     }
 
     async function getIntroduction(){
-        if(!document.querySelector('.hh2c6.G7m0Af')){
-            return;
-        }
 
-         // wait for the tab to be activate
-         const introductionClass ='.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde';
-         const introductionArea =document.querySelector(introductionClass);
-         if(!introductionArea){
-            await switchToTab(2, introductionClass); // Wait for the reviews container
-        }
-
-        const contents = introductionArea.querySelectorAll('.fontBodyMedium');
-        if(contents.length == 0){
-             return [];
-        }
-
+        const introductionTab = document.querySelector('button[data-tab-index="2"]');
+        if(!introductionTab) return '';
         
+        const introductionArea = '.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde'
+        if (!introductionTab.classList.contains('G7m0Af')) {
+            await switchToTab(tabConstant.introduce, introductionArea);
+        }
+
+        const introductions = document.querySelector(introductionArea)?.querySelectorAll('.fontBodyMedium');
+
+        if(introductions.length > 0){
+           return Array.from(introductions)
+            .map(node => node.innerHTML?.replace(/\s*class="[^"]*"/g, '')) 
+            .join('');
+        }
+
+        return '';
     }
 
     function extractImages(el){
@@ -134,11 +148,11 @@ function extractInformation(shouldExtractAllComments, commentCount) {
     }
 
     async function main() {
-        const { currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber } = await basicInfomation();
-        const reviews = await getComments();
+        const { currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber } = await generalInformation();
+        const reviews = await getReviews();
         const introduction = await getIntroduction();
 
-        console.log({ currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber, reviews });
+        console.log({ currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber, reviews, introduction });
     }
 
     main();
