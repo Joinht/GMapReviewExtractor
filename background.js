@@ -3,7 +3,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
         chrome.scripting.executeScript({
             target: { tabId: request.tabId },
             func: extractInformation,
-            args: [request.shouldExtractAllComments, request.commentCount]
+            args: [request.shouldExtractAllComments, request.numberOfComment]
         }, (results) => {
             // Send the result back to the popup.js
             sendResponse(results[0].result); // results[0].result contains the returned value from extractInformation
@@ -14,7 +14,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
     }
 });
 
-async function extractInformation(shouldExtractAllComments, commentCount) {
+async function extractInformation(shouldExtractAllComments, numberOfComment) {
 
     const tabConstant = {
         general: 0,
@@ -97,10 +97,22 @@ async function extractInformation(shouldExtractAllComments, commentCount) {
         let reviews = [];
         const reviewArea = document.querySelector(reviewAreaElement)?.querySelector(reviewListElement);
         var reviewNodes = reviewArea.querySelectorAll('.fontBodyMedium');
-        const limit = shouldExtractAllComments ? reviewNodes.length : Math.min(reviewNodes.length, commentCount);
-
+        const limit = shouldExtractAllComments ? 1000000 : Math.min(reviewNodes.length, numberOfComment);
+        
         for (let i = 0; i < limit; i++) {
             const el = reviewNodes[i];
+
+            // in case element not available => try to load more element
+            // TODO: should split smaller payload to call api
+            if(!el){
+                const previousScrollHeight = 0;
+                const currentScrollHeight = reviewArea.scrollHeight;
+                if(previousScrollHeight != currentScrollHeight){
+                    previousScrollHeight = currentScrollHeight;
+                    currentScrollHeight = reviewArea.scrollTop = reviewArea.scrollHeight;
+                }
+            }
+
             const user = el.querySelector('.d4r55')?.innerText || 'Unknown User';
             const rating = el.querySelector('span[class*="kvMYJc"]')?.querySelectorAll('.elGi1d')?.length || '0';
             const comment = el.querySelector('.MyEned')?.innerText || '';
