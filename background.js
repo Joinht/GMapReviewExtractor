@@ -4,9 +4,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
             target: { tabId: request.tabId },
             func: extractInformation,
             args: [request.shouldExtractAllComments, request.numberOfComment]
-        }, (results) => {
-            // Send the result back to the popup.js
-            sendResponse(results[0].result); // results[0].result contains the returned value from extractInformation
         });
 
         // Return true to indicate you want to send a response asynchronously
@@ -79,6 +76,19 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
             return {currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber};
     }
 
+    function getTotalReview(){
+        let totalReview = 0;
+        const totalReviewText = document.querySelector('.PPCwl .fontBodySmall')?.innerText; 
+        const regex = /\d+/;
+        const match = totalReviewText.match(regex);
+
+        if (match) {
+            totalReview = match[0];
+        }
+
+        return totalReview;
+    }
+
     async function getReviews(){
 
         // wait for the tab to be activate
@@ -95,35 +105,64 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
         await waitForElement(reviewListElement, true);
 
         let reviews = [];
-        const reviewArea = document.querySelector(reviewAreaElement)?.querySelector(reviewListElement);
-        var reviewNodes = reviewArea.querySelectorAll('.fontBodyMedium');
-        const limit = shouldExtractAllComments ? 1000000 : Math.min(reviewNodes.length, numberOfComment);
+        const reviewArea = document.querySelector(reviewAreaElement);
+        const reviewList = reviewArea?.querySelector(reviewListElement);
+        var reviewNodes = reviewList.querySelectorAll('.fontBodyMedium');
+
+        const totalReview = getTotalReview();
+        const limit = shouldExtractAllComments ? totalReview : Math.min(reviewNodes.length, numberOfComment);
         
         for (let i = 0; i < limit; i++) {
-            const el = reviewNodes[i];
+            let reviewNode = reviewNodes[i];
 
             // in case element not available => try to load more element
-            // TODO: should split smaller payload to call api
-            if(!el){
-                const previousScrollHeight = 0;
-                const currentScrollHeight = reviewArea.scrollHeight;
-                if(previousScrollHeight != currentScrollHeight){
-                    previousScrollHeight = currentScrollHeight;
-                    currentScrollHeight = reviewArea.scrollTop = reviewArea.scrollHeight;
-                }
+            if(!reviewNode){
+                reviewNodes = await loadMoreReviewNodes(reviewArea, reviewListElement, limit);
+                reviewNode = reviewNodes[i];
             }
 
-            const user = el.querySelector('.d4r55')?.innerText || 'Unknown User';
-            const rating = el.querySelector('span[class*="kvMYJc"]')?.querySelectorAll('.elGi1d')?.length || '0';
-            const comment = el.querySelector('.MyEned')?.innerText || '';
-            const commentTime  = el.querySelector('.rsqaWe')?.innerText || '';
+            const user = reviewNode.querySelector('.d4r55')?.innerText || 'Unknown User';
+            const rating = reviewNode.querySelector('span[class*="kvMYJc"]')?.querySelectorAll('.elGi1d')?.length || '0';
+            const comment = reviewNode.querySelector('.MyEned')?.innerText || '';
+            const commentTime  = reviewNode.querySelector('.rsqaWe')?.innerText || '';
 
-            const images = extractImages(el);
+            const images = extractImages(reviewNode);
 
             reviews.push({ user, rating, comment, commentTime, images });
         }
 
         return reviews;
+    } 
+
+    async function loadMoreReviewNodes(reviewArea, reviewListElement, numberOfComment) {
+        const reviewList = reviewArea?.querySelector(reviewListElement);
+        let reviewNodes = [];
+        let previousScrollHeight;
+    
+        // Scroll to the bottom of the review area
+        reviewArea.scrollTop = reviewArea.scrollHeight;
+    
+        // Wait for the scroll and lazy load to finish
+        await new Promise((resolve) => {
+            const interval = setInterval(() => {
+                if (reviewArea.scrollHeight === previousScrollHeight) {
+                    clearInterval(interval);
+                    resolve();
+                } else {
+                    previousScrollHeight = reviewArea.scrollHeight;
+                }
+            }, 500); // Check every 500 milliseconds
+        });
+    
+        // Update review nodes
+        reviewNodes = reviewList.querySelectorAll('.fontBodyMedium');
+    
+        // If not enough review nodes are loaded, call the function recursively
+        if (reviewNodes.length < numberOfComment) {
+            return loadMoreReviewNodes(reviewArea, reviewListElement, numberOfComment);
+        }
+    
+        return reviewNodes;
     }
 
     async function getIntroduction(){
@@ -173,5 +212,6 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     }
 
     const result = await main();
+    console.log(result);
     return result;
 }

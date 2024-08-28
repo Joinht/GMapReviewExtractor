@@ -13,16 +13,6 @@ document.getElementById('extractButton').addEventListener('click', () => {
             tabId: tabs[0].id,
             shouldExtractAllComments: shouldExtractAllComments,
             numberOfComment: numberOfComment
-        }, (response) => {
-            debugger;
-            if (chrome.runtime.lastError) {
-                console.error('Error:', chrome.runtime.lastError.message);
-            } else if (response.error) {
-                console.error('Response Error:', response.error);
-            } else {
-                console.log('Received Information in popup.js:', response);
-
-            }
         });
     });
 });
