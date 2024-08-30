@@ -20,21 +20,46 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     }
 
     // Utility function to wait for an element to appear
-    function waitForElement(selector, hasChild = false, timeout = 10000, interval = 100) {
+    function waitForElement(selector, hasChild = false, waitTime = 5000, timeout = 10000, interval = 500) {
         return new Promise((resolve, reject) => {
             const startTime = Date.now();
     
             const checkInterval = setInterval(() => {
-                const element = document.querySelector(selector);
+                if(selector){
+                    const element = document.querySelector(selector);
                 
-                // check the condition to determine that element already displayed
-                if (element && (!hasChild || element.hasChildNodes())) {
-                    clearInterval(checkInterval);
-                    resolve(element);
-                } else if (Date.now() - startTime > timeout) {
-                    clearInterval(checkInterval);
-                    reject(`Timeout: Element ${selector} not found within ${timeout}ms`);
+                    // check the condition to determine that element already displayed
+                    if (element && (!hasChild || element.hasChildNodes())) {
+                        clearInterval(checkInterval);
+                        resolve(element);
+                    } else if (Date.now() - startTime > timeout) {
+                        clearInterval(checkInterval);
+                        reject(`Timeout: Element ${selector} not found within ${timeout}ms`);
+                    }
+                }else{
+                    if(Date.now() - startTime > waitTime){
+                        resolve();
+                    }
                 }
+                
+            }, interval);
+        });
+    }
+
+    function waitForElementInvisible(selector, timeout = 10000, interval = 500) {
+        return new Promise((resolve, reject) => {
+            const startTime = Date.now();
+    
+            const checkInterval = setInterval(() => {
+                    const element = document.querySelector(selector);
+                    // check the condition to determine that element already displayed
+                    if (!element) {
+                        clearInterval(checkInterval);
+                        resolve();
+                    } else if (Date.now() - startTime > timeout) {
+                        clearInterval(checkInterval);
+                        reject(`Timeout: Element ${selector} not disspear within ${timeout}ms`);
+                    }
             }, interval);
         });
     }
@@ -54,7 +79,6 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
             
             const currentUrl = window.location.href;
             const location = document.querySelector(generalElement)?.innerText
-            const thumbnail = document.querySelector(".RZ66Rb.FgCUCc img")?.src;
             const totalRating = document.querySelector(".F7nice span span")?.innerText ||  0;
 
             const address = document.querySelector('[data-item-id="address"]')?.querySelector('.Io6YTe')?.innerText || '';
@@ -73,20 +97,61 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
             const webSite = document.querySelector('.rogA2c.ITvuef .fontBodyMedium')?.innerText || '';
             const phoneNumber = document.querySelector('[data-item-id^="phone:tel:"]')?.querySelector('.Io6YTe.fontBodyMedium')?.innerText || '';
 
-            return {currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber};
+           var images =  await getThumbnails();
+
+           document.querySelector('#omnibox-singlebox .hYBOP.FeXq4d').click();
+
+           await waitForElementInvisible('div[class="google-symbols G47vBd"]');
+
+            return {currentUrl, location, images, totalRating, address, openingHours, webSite, phoneNumber};
+    }
+
+    async function getThumbnails(){
+        const thumbnail = document.querySelector(".RZ66Rb.FgCUCc img");
+        thumbnail.click();
+        await waitForElement('#omnibox-singlebox');
+
+        const imageAreaElement = '.k7jAl.miFGmb.lJ3Kh.PLbyfe';
+        const imageArea = await waitForElement(imageAreaElement);
+        const imageChildNodes = imageArea?.querySelector('.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde')?.querySelector('.m6QErb.XiKgde')?.childNodes;
+        let images = [];
+        for (let i = 0; i < imageChildNodes.length; i++) {
+            let image = imageChildNodes[i]?.querySelector('.U39Pmb');
+            const imageUrl =  regexImageUrl(image);
+            if(imageUrl){
+                 images.push(imageUrl);
+            }
+        }
+
+        return images;
     }
 
     function getTotalReview(){
-        let totalReview = 0;
         const totalReviewText = document.querySelector('.PPCwl .fontBodySmall')?.innerText; 
         const regex = /\d+/;
         const match = totalReviewText.match(regex);
+        return match ? match[0] : 0;
+    }
 
-        if (match) {
-            totalReview = match[0];
+    async function sortByLatestComment(){
+        // filter latest review
+        const sortByElement = document.querySelector('div[class="m6QErb Hk4XGb XiKgde tLjsW "] button');
+        sortByElement.click();
+
+        // dropdown sort by 
+        await waitForElement('.fontBodyLarge.yu5kgd.vij30.kA9KIf');
+
+        const sortByLatestOption = document.querySelector('.fontBodyLarge.yu5kgd.vij30.kA9KIf')?.querySelector('div[data-index="1"]');
+        sortByLatestOption.click();
+    }
+
+    async function expandComment(commentElement){
+        const expanReviewElement = commentElement?.querySelector('button.w8nwRe.kyuRq');
+        if(expanReviewElement){
+            expanReviewElement.click();
+            const dataReviewId = expanReviewElement.getAttribute('data-review-id');
+            await waitForElementInvisible('.MyEned button[data-review-id='+dataReviewId+']');
         }
-
-        return totalReview;
     }
 
     async function getReviews(){
@@ -100,6 +165,9 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
             await switchToTab(tabConstant.review, reviewAreaElement);
         }
 
+       // sort comment by latest
+       await sortByLatestComment();
+
         // wait for review list are display
         const reviewListElement = 'div[class="m6QErb XiKgde "]';
         await waitForElement(reviewListElement, true);
@@ -110,8 +178,8 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
         var reviewNodes = reviewList.querySelectorAll('.fontBodyMedium');
 
         const totalReview = getTotalReview();
-        const limit = shouldExtractAllComments ? totalReview : Math.min(reviewNodes.length, numberOfComment);
-        
+        const limit = shouldExtractAllComments ? totalReview : numberOfComment;
+
         for (let i = 0; i < limit; i++) {
             let reviewNode = reviewNodes[i];
 
@@ -123,7 +191,19 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
 
             const user = reviewNode.querySelector('.d4r55')?.innerText || 'Unknown User';
             const rating = reviewNode.querySelector('span[class*="kvMYJc"]')?.querySelectorAll('.elGi1d')?.length || '0';
-            const comment = reviewNode.querySelector('.MyEned')?.innerText || '';
+
+            // There are 2 type of comment structure
+            // 1 - display inside of div has class .MyEned
+            // 2 - display with child nodes in a div without any id or class
+            let commentElement = reviewNode.querySelector('.MyEned');
+            if(!commentElement){
+                commentElement = reviewNode.querySelector(".DU9Pgb").nextSibling;
+            }
+            
+            // expan comment if too log
+           await expandComment(commentElement);
+
+            const comment = commentElement?.innerText || '';
             const commentTime  = reviewNode.querySelector('.rsqaWe')?.innerText || '';
 
             const images = extractImages(reviewNode);
@@ -186,29 +266,39 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
         return '';
     }
 
+    function regexImageUrl(el){
+        const style = el.getAttribute('style');
+        const urlMatch = style.match(/url\("([^"]+)"\)/);
+                if (urlMatch && urlMatch[1]) {
+                    return urlMatch[1];
+                }
+
+                return "";
+    }
+
     function extractImages(el){
-        // extract images
         const imageElements = el.querySelector('.KtCyie')?.childNodes;
         const images =[];
         if(imageElements && imageElements.length > 0){
             for (let i = 0; i < imageElements.length; i++) {
                 const el = imageElements[i];
-                const style = el.getAttribute('style');
-                const urlMatch = style.match(/url\("([^"]+)"\)/);
-                if (urlMatch && urlMatch[1]) {
-                    images.push(urlMatch[1]);
+                const image = regexImageUrl(el);
+                if(image){
+                    images.push(image)
                 }
             }
         }
+
+        return images;
     }
 
     async function main() {
 
-        const { currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber } = await generalInformation();
+        const { currentUrl, location, images, totalRating, address, openingHours, webSite, phoneNumber } = await generalInformation();
         const reviews = await getReviews();
         const introduction = await getIntroduction();
 
-        return { currentUrl, location, thumbnail, totalRating, address, openingHours, webSite, phoneNumber, reviews, introduction };
+        return { currentUrl, location, images, totalRating, address, openingHours, webSite, phoneNumber, reviews, introduction };
     }
 
     const result = await main();
