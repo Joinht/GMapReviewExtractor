@@ -64,6 +64,25 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
         });
     }
 
+    function extractCoordinates(url) {
+        // Use a regular expression to match the part of the URL that contains the coordinates and zoom level
+        const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+        const match = url.match(regex);
+    
+        if (match) {
+            // Extract latitude, longitude, and zoom level from the match groups
+            const latitude = match[1];
+            const longitude = match[2];
+    
+            return {
+                latitude: parseFloat(latitude),
+                longitude: parseFloat(longitude)
+            };
+        } else {
+            return {latitude: null, longitude: null}; // Return null 
+        }
+    }
+
     async function switchToTab(index, waitForSelector) {
         const tabLists = document.querySelector('div.RWPxGd[role="tablist"]')?.childNodes;
         tabLists[index].click();
@@ -78,6 +97,9 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
             }
             
             const currentUrl = window.location.href;
+
+            const {latitude, longitude} = extractCoordinates(currentUrl);
+
             const location = document.querySelector(generalElement)?.innerText
             const totalRating = document.querySelector(".F7nice span span")?.innerText ||  0;
 
@@ -97,16 +119,11 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
             const webSite = document.querySelector('.rogA2c.ITvuef .fontBodyMedium')?.innerText || '';
             const phoneNumber = document.querySelector('[data-item-id^="phone:tel:"]')?.querySelector('.Io6YTe.fontBodyMedium')?.innerText || '';
 
-           var images =  await getThumbnails();
-
-           document.querySelector('#omnibox-singlebox .hYBOP.FeXq4d').click();
-
-           await waitForElementInvisible('div[class="google-symbols G47vBd"]');
-
-            return {currentUrl, location, images, totalRating, address, openingHours, webSite, phoneNumber};
+           var albumImages =  await getAlbumImage();
+            return {currentUrl, location, latitude, longitude, albumImages, totalRating, address, openingHours, webSite, phoneNumber};
     }
 
-    async function getThumbnails(){
+    async function getAlbumImage(){
         const thumbnail = document.querySelector(".RZ66Rb.FgCUCc img");
         thumbnail.click();
         await waitForElement('#omnibox-singlebox');
@@ -122,6 +139,9 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
                  images.push(imageUrl);
             }
         }
+
+        document.querySelector('#omnibox-singlebox .hYBOP.FeXq4d').click();
+        await waitForElementInvisible('div[class="google-symbols G47vBd"]');
 
         return images;
     }
@@ -294,11 +314,11 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
 
     async function main() {
 
-        const { currentUrl, location, images, totalRating, address, openingHours, webSite, phoneNumber } = await generalInformation();
+        const { currentUrl, location, latitude, longitude, albumImages, totalRating, address, openingHours, webSite, phoneNumber } = await generalInformation();
         const reviews = await getReviews();
         const introduction = await getIntroduction();
 
-        return { currentUrl, location, images, totalRating, address, openingHours, webSite, phoneNumber, reviews, introduction };
+        return { currentUrl, location, latitude, longitude, albumImages, totalRating, address, openingHours, webSite, phoneNumber, reviews, introduction };
     }
 
     const result = await main();
