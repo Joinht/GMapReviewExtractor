@@ -72,6 +72,14 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     });
   }
 
+  async function switchToTab(index, waitForSelector) {
+    const tabLists = document.querySelector(
+      'div.RWPxGd[role="tablist"]'
+    )?.childNodes;
+    tabLists[index].click();
+    await waitForElement(waitForSelector);
+  }
+
   function extractCoordinates(url) {
     // Use a regular expression to match the part of the URL that contains the coordinates and zoom level
     const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
@@ -91,12 +99,40 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     }
   }
 
-  async function switchToTab(index, waitForSelector) {
-    const tabLists = document.querySelector(
-      'div.RWPxGd[role="tablist"]'
-    )?.childNodes;
-    tabLists[index].click();
-    await waitForElement(waitForSelector);
+  function extractAddressDetails(address) {
+    if(!address)
+      return {street: "", ward:"", district: "", city: "", country: ""};
+    
+    const parts = address.split(',')?.map(part => part?.trim());
+    // Street Number and Name, Ward, District, City, Country
+    const street   = parts[0] || null;
+    const ward     = parts[1] || null; 
+    const district = parts[2] || null; 
+    const city     = parts[3] || null; 
+    const country  = parts[4] || null; 
+    
+    return {
+        street,
+        ward,
+        district,
+        city,
+        country
+    };
+}
+
+  function extractAddress(currentUrl){
+    const address = document.querySelector('[data-item-id="address"]')?.querySelector(".Io6YTe")?.innerText || "";
+    const { latitude, longitude } = extractCoordinates(currentUrl);
+
+    const {
+      street,
+      ward,
+      district,
+      city,
+      country
+  } = extractAddressDetails(address);
+    
+    return {street, ward, district, city, country, latitude, longitude}
   }
 
   async function generalInformation() {
@@ -108,17 +144,10 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
 
     const currentUrl = window.location.href;
 
-    const { latitude, longitude } = extractCoordinates(currentUrl);
+    const address = extractAddress(currentUrl);
 
     const location = document.querySelector(generalElement)?.innerText;
-    const totalRating =
-      document.querySelector(".F7nice span span")?.innerText || 0;
-
-    const address =
-      document
-        .querySelector('[data-item-id="address"]')
-        ?.querySelector(".Io6YTe")?.innerText || "";
-
+    const totalRating = document.querySelector(".F7nice span span")?.innerText || 0;
     // Select all rows in the table that contains the opening hours information
     const openingHoursRows = document.querySelectorAll("tr.y0skZc");
 
@@ -146,8 +175,6 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     return {
       currentUrl,
       location,
-      latitude,
-      longitude,
       albumImages,
       totalRating,
       address,
@@ -377,8 +404,6 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     const {
       currentUrl,
       location,
-      latitude,
-      longitude,
       albumImages,
       totalRating,
       address,
@@ -392,8 +417,6 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     return {
       currentUrl,
       location,
-      latitude,
-      longitude,
       albumImages,
       totalRating,
       address,
