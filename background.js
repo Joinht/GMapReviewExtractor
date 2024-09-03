@@ -100,39 +100,37 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
   }
 
   function extractAddressDetails(address) {
-    if(!address)
-      return {street: "", ward:"", district: "", city: "", country: ""};
-    
-    const parts = address.split(',')?.map(part => part?.trim());
+    if (!address)
+      return { street: "", ward: "", district: "", city: "", country: "" };
+
+    const parts = address.split(",")?.map((part) => part?.trim());
     // Street Number and Name, Ward, District, City, Country
-    const street   = parts[0] || null;
-    const ward     = parts[1] || null; 
-    const district = parts[2] || null; 
-    const city     = parts[3] || null; 
-    const country  = parts[4] || null; 
-    
+    const street = parts[0] || null;
+    const ward = parts[1] || null;
+    const district = parts[2] || null;
+    const city = parts[3] || null;
+    const country = parts[4] || null;
+
     return {
-        street,
-        ward,
-        district,
-        city,
-        country
-    };
-}
-
-  function extractAddress(currentUrl){
-    const address = document.querySelector('[data-item-id="address"]')?.querySelector(".Io6YTe")?.innerText || "";
-    const { latitude, longitude } = extractCoordinates(currentUrl);
-
-    const {
       street,
       ward,
       district,
       city,
-      country
-  } = extractAddressDetails(address);
-    
-    return {street, ward, district, city, country, latitude, longitude}
+      country,
+    };
+  }
+
+  function extractAddress(currentUrl) {
+    const address =
+      document
+        .querySelector('[data-item-id="address"]')
+        ?.querySelector(".Io6YTe")?.innerText || "";
+    const { latitude, longitude } = extractCoordinates(currentUrl);
+
+    const { street, ward, district, city, country } =
+      extractAddressDetails(address);
+
+    return { street, ward, district, city, country, latitude, longitude };
   }
 
   async function generalInformation() {
@@ -143,11 +141,13 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     }
 
     const currentUrl = window.location.href;
-
     const address = extractAddress(currentUrl);
 
+    const category = document.querySelector('button[class="DkEaL "]')?.innerText || '';
+
     const location = document.querySelector(generalElement)?.innerText;
-    const totalRating = document.querySelector(".F7nice span span")?.innerText || 0;
+    const totalRating =
+      document.querySelector(".F7nice span span")?.innerText || 0;
     // Select all rows in the table that contains the opening hours information
     const openingHoursRows = document.querySelectorAll("tr.y0skZc");
 
@@ -167,7 +167,7 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
         ?.querySelector(".Io6YTe.fontBodyMedium")?.innerText || "";
 
     var albumImages = await getAlbumImage();
-    
+
     // back to previous tab after get all of image in album
     document.querySelector("#omnibox-singlebox .hYBOP.FeXq4d").click();
     await waitForElementInvisible('div[class="google-symbols G47vBd"]');
@@ -175,6 +175,7 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     return {
       currentUrl,
       location,
+      category, 
       albumImages,
       totalRating,
       address,
@@ -191,9 +192,11 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
 
     const imageAreaElement = ".k7jAl.miFGmb.lJ3Kh.PLbyfe";
     const imageArea = await waitForElement(imageAreaElement);
+    
     const imageChildNodes = imageArea
       ?.querySelector(".m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde")
       ?.querySelector(".m6QErb.XiKgde")?.childNodes;
+
     let images = [];
     for (let i = 0; i < imageChildNodes.length; i++) {
       let image = imageChildNodes[i]?.querySelector(".U39Pmb");
@@ -404,6 +407,7 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     const {
       currentUrl,
       location,
+      category,
       albumImages,
       totalRating,
       address,
@@ -417,6 +421,7 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     return {
       currentUrl,
       location,
+      category,
       albumImages,
       totalRating,
       address,
