@@ -1,9 +1,11 @@
+import { elementConstant } from './elementConstant.js';
+
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "extractInfo") {
     chrome.scripting.executeScript({
       target: { tabId: request.tabId },
       func: extractInformation,
-      args: [request.shouldExtractAllComments, request.numberOfComment],
+      args: [elementConstant],
     });
 
     // Return true to indicate you want to send a response asynchronously
@@ -11,7 +13,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-async function extractInformation(shouldExtractAllComments, numberOfComment) {
+async function extractInformation(elementConstant) {
+  debugger;
+  var self = this;
+  self._element = elementConstant;
   const tabConstant = {
     general: 0,
     review: 1,
@@ -73,9 +78,7 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
   }
 
   async function switchToTab(index, waitForSelector) {
-    const tabLists = document.querySelector(
-      'div.RWPxGd[role="tablist"]'
-    )?.childNodes;
+    const tabLists = document.querySelector(self._element.location_container.fourth_parent.tab.element)?.childNodes;
     tabLists[index].click();
     await waitForElement(waitForSelector);
   }
@@ -134,8 +137,9 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
   }
 
   async function generalInformation() {
+    debugger;
     // wait for the tab to be activate
-    const generalElement = ".DUwDvf.lfPIob";
+    const generalElement = self._element.location_container.fourth_parent.location.name;
     if (!document.querySelector(generalElement)) {
       await switchToTab(tabConstant.general, generalElement); // Wait for the location element
     }
@@ -143,11 +147,11 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     const currentUrl = window.location.href;
     const address = extractAddress(currentUrl);
 
-    const category = document.querySelector('button[class="DkEaL "]')?.innerText || '';
+    const category = document.querySelector(self._element.location_container.fourth_parent.location.category)?.innerText || '';
 
     const location = document.querySelector(generalElement)?.innerText;
-    const totalRating =
-      document.querySelector(".F7nice span span")?.innerText || 0;
+    const totalRating = document.querySelector(self._element.location_container.fourth_parent.location.rating)?.innerText || 0;
+
     // Select all rows in the table that contains the opening hours information
     const openingHoursRows = document.querySelectorAll("tr.y0skZc");
 
@@ -269,8 +273,7 @@ async function extractInformation(shouldExtractAllComments, numberOfComment) {
     const reviewList = reviewArea?.querySelector(reviewListElement);
     var reviewNodes = reviewList.querySelectorAll(".fontBodyMedium");
 
-    const totalReview = getTotalReview();
-    const limit = shouldExtractAllComments ? totalReview : numberOfComment;
+    const limit = getTotalReview();
 
     for (let i = 0; i < limit; i++) {
       let reviewNode = reviewNodes[i];

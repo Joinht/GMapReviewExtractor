@@ -5,7 +5,8 @@
     "description": "Extracts comments from Google Maps.",
     "permissions": ["activeTab", "scripting", "tabs"],
     "background": {
-      "service_worker": "background.js"
+      "service_worker": "background.js",
+      "type": "module"
     },
     "action": {
       "default_popup": "popup/popup.html",
@@ -19,11 +20,5 @@
       "16": "images/icons/16.png",
       "48": "images/icons/32.png",
       "128": "images/icons/128.png"
-    },
-    "content_scripts": [
-        {
-            "matches": ["https://www.google.com/maps/place/*"],
-            "js": ["constant.js"]
-        }
-    ]
+    }
   }
