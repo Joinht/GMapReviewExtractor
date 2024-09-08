@@ -24,7 +24,8 @@ export const DOM_TREE = {
                     tab: {
                         list: {selector: 'div.RWPxGd[role="tablist"]'},
                         activeClass: {selector: "G7m0Af"},
-                        buttonReviewTab: {selector: 'button[data-tab-index="1"]'}
+                        buttonReviewTab: {selector: 'button[data-tab-index="1"]'},
+                        buttonIntroductionTab: {selector: 'button[data-tab-index="2"]'}
                     },
                     generalTab: {
                         selector: 'div[class="m6QErb XiKgde "]',
@@ -67,7 +68,8 @@ export const DOM_TREE = {
                                 }
                             }
                         }
-                    }
+                    },
+                    introduction: {selector: 'div[class="iP2t7d fontBodyMedium"]'}
                 }
             },
             albumSection: {

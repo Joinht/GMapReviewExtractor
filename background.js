@@ -66,8 +66,8 @@ async function extractInformation(DOM_TREE) {
       return null;
   }
 
-  function DOMQuerySelectorAll(tree, path){
-    const selector = getElementByTreePath(tree, path);
+  function DOMQuerySelectorAll(tree, path, pathFromRoot = false){
+    const selector = getElementByTreePath(tree, path,pathFromRoot);
     if(selector)
       return querySelectorAll(selector);
 
@@ -398,20 +398,17 @@ async function extractInformation(DOM_TREE) {
   }
 
   async function getIntroduction() {
-    const introductionTab = document.querySelector(
-      'button[data-tab-index="2"]'
-    );
-    if (!introductionTab) return "";
+    debugger;
+    const buttonIntroductionTab = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > tab > buttonIntroductionTab');
+    if (!buttonIntroductionTab) return "";
 
-    const introductionArea = ".m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde";
-    if (!introductionTab.classList.contains("G7m0Af")) {
-      await switchToTab(tabConstant.introduce, introductionArea);
+    const mainSectionSelector = getElementByTreePath(DOM_TREE, 'locationContainer > mainSection', true);
+    const tabActive = getElementByTreePath(DOM_TREE, 'locationContainer > mainSection > tab > activeClass');
+    if (!buttonIntroductionTab.classList.contains(tabActive)) {
+      await switchToTab(tabConstant.introduce, mainSectionSelector);
     }
 
-    const introductions = document
-      .querySelector(introductionArea)
-      ?.querySelectorAll(".fontBodyMedium");
-
+    const introductions = DOMQuerySelectorAll(DOM_TREE, 'locationContainer > mainSection > introduction', true);
     if (introductions.length > 0) {
       return Array.from(introductions)
         .map((node) => node.innerHTML?.replace(/\s*class="[^"]*"/g, ""))
