@@ -218,8 +218,10 @@ async function extractInformation(DOM_TREE) {
 
     // back to previous tab after get all of image in album
     const topBarAlbum = DOMQuerySelector(DOM_TREE.locationContainer, 'albumSection > topBarAlbum');
-    topBarAlbum.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbum > escapeAlbum')).click();
-    await waitForElementInvisible('div[class="google-symbols G47vBd"]');
+    if(topBarAlbum){
+      topBarAlbum.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbum > escapeAlbum')).click();
+      await waitForElementInvisible('div[class="google-symbols G47vBd"]');
+    }
 
     return {
       currentUrl,
@@ -235,8 +237,11 @@ async function extractInformation(DOM_TREE) {
   }
 
   async function getAlbumImage() {
-    const thumbnailElement = getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > generalTab > thumbnail');
-    querySelector(thumbnailElement).click();
+    const thumbnailSelector = querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > generalTab > thumbnail'));
+    if(!thumbnailSelector)
+      return [];
+
+    thumbnailSelector.click();
     await waitForElement(getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbum'));
 
     const albumSectionSelector = getElementByTreePath(DOM_TREE.locationContainer, 'albumSection');
