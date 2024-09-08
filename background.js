@@ -1,28 +1,80 @@
-import { elementConstant } from './elementConstant.js';
+import { DOM_TREE } from './domStructure.js';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "extractInfo") {
     chrome.scripting.executeScript({
       target: { tabId: request.tabId },
       func: extractInformation,
-      args: [elementConstant],
+      args: [DOM_TREE],
     });
 
-    // Return true to indicate you want to send a response asynchronously
     return true;
   }
 });
 
-async function extractInformation(elementConstant) {
-  debugger;
-  var self = this;
-  self._element = elementConstant;
+async function extractInformation(DOM_TREE) {
+
   const tabConstant = {
     general: 0,
     review: 1,
     introduce: 2,
   };
 
+  function getElementByTreePath (tree, path, pathFromRoot = false) {
+      let currentNode = tree;
+      if(!path)
+        return null;
+
+      const pathArr = path.split('>');
+      let selector = '';
+      for (const node of pathArr) {
+        if(currentNode.children){
+          currentNode = currentNode.children[node.trim()];
+        }else{
+          currentNode = currentNode[node.trim()];
+        }
+
+        if (!currentNode) {
+              console.error('Invalid path in the DOM tree:', path);
+              return null;
+          }
+          
+          if(pathFromRoot){
+            selector += ` ${currentNode.selector}` ;
+          }else{
+            selector = currentNode.selector;
+          }
+      }
+      
+      return selector;
+  };
+
+  function querySelectorAll(selector){
+    return document.querySelectorAll(selector);
+  }
+
+  function querySelector(selector){
+    return document.querySelector(selector);
+  }
+
+
+  function DOMQuerySelector(tree, path){
+      const selector = getElementByTreePath(tree, path);
+      if(selector)
+        return querySelector(selector);
+
+      return null;
+  }
+
+  function DOMQuerySelectorAll(tree, path){
+    const selector = getElementByTreePath(tree, path);
+    if(selector)
+      return querySelectorAll(selector);
+
+    return null;
+  }
+
+  
   // Utility function to wait for an element to appear
   function waitForElement(
     selector,
@@ -78,18 +130,18 @@ async function extractInformation(elementConstant) {
   }
 
   async function switchToTab(index, waitForSelector) {
-    const tabLists = document.querySelector(self._element.location_container.fourth_parent.tab.element)?.childNodes;
+    const tabLists = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > tab > list')?.childNodes;
     tabLists[index].click();
     await waitForElement(waitForSelector);
   }
 
   function extractCoordinates(url) {
-    // Use a regular expression to match the part of the URL that contains the coordinates and zoom level
+    // Use a regular expression to match the part of the URL that contains the coordinates
     const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
     const match = url.match(regex);
 
     if (match) {
-      // Extract latitude, longitude, and zoom level from the match groups
+      // Extract latitude, longitude from the match groups
       const latitude = match[1];
       const longitude = match[2];
 
@@ -124,10 +176,7 @@ async function extractInformation(elementConstant) {
   }
 
   function extractAddress(currentUrl) {
-    const address =
-      document
-        .querySelector('[data-item-id="address"]')
-        ?.querySelector(".Io6YTe")?.innerText || "";
+    const address = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > generalTab > address').innerText;
     const { latitude, longitude } = extractCoordinates(currentUrl);
 
     const { street, ward, district, city, country } =
@@ -137,43 +186,39 @@ async function extractInformation(elementConstant) {
   }
 
   async function generalInformation() {
-    debugger;
     // wait for the tab to be activate
-    const generalElement = self._element.location_container.fourth_parent.location.name;
+    const generalElement = getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > location > name');
     if (!document.querySelector(generalElement)) {
       await switchToTab(tabConstant.general, generalElement); // Wait for the location element
     }
 
+    const category = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > location > category').innerText;
+    const location = document.querySelector(generalElement)?.innerText;
+    const totalRating = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > location > rating').innerText;
+
     const currentUrl = window.location.href;
     const address = extractAddress(currentUrl);
 
-    const category = document.querySelector(self._element.location_container.fourth_parent.location.category)?.innerText || '';
-
-    const location = document.querySelector(generalElement)?.innerText;
-    const totalRating = document.querySelector(self._element.location_container.fourth_parent.location.rating)?.innerText || 0;
-
     // Select all rows in the table that contains the opening hours information
-    const openingHoursRows = document.querySelectorAll("tr.y0skZc");
+
+    const openingHoursRows = DOMQuerySelectorAll(DOM_TREE.locationContainer, 'mainSection > generalTab > openinghours');
 
     let openingHours = [];
 
     openingHoursRows.forEach((row) => {
-      const day = row.querySelector("td.ylH6lf div")?.innerText || "";
-      const hours = row.querySelector("td.mxowUb li.G8aQO")?.innerText || "";
+      const day = row.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > generalTab > openinghours > day'))?.innerText || "";
+      const hours = row.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > generalTab > openinghours > hours'))?.innerText || "";
       openingHours.push({ day, hours });
     });
 
-    const webSite =
-      document.querySelector(".rogA2c.ITvuef .fontBodyMedium")?.innerText || "";
-    const phoneNumber =
-      document
-        .querySelector('[data-item-id^="phone:tel:"]')
-        ?.querySelector(".Io6YTe.fontBodyMedium")?.innerText || "";
+    const webSite = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > generalTab > website')?.innerText;
+    const phoneNumber = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > generalTab > phone')?.innerText;
 
     var albumImages = await getAlbumImage();
 
     // back to previous tab after get all of image in album
-    document.querySelector("#omnibox-singlebox .hYBOP.FeXq4d").click();
+    const topBarAlbum = DOMQuerySelector(DOM_TREE.locationContainer, 'albumSection > topBarAlbum');
+    topBarAlbum.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbum > escapeAlbum')).click();
     await waitForElementInvisible('div[class="google-symbols G47vBd"]');
 
     return {
@@ -190,20 +235,17 @@ async function extractInformation(elementConstant) {
   }
 
   async function getAlbumImage() {
-    const thumbnail = document.querySelector(".RZ66Rb.FgCUCc img");
-    thumbnail.click();
-    await waitForElement("#omnibox-singlebox");
+    const thumbnailElement = getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > generalTab > thumbnail');
+    querySelector(thumbnailElement).click();
+    await waitForElement(getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbum'));
 
-    const imageAreaElement = ".k7jAl.miFGmb.lJ3Kh.PLbyfe";
-    const imageArea = await waitForElement(imageAreaElement);
-    
-    const imageChildNodes = imageArea
-      ?.querySelector(".m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde")
-      ?.querySelector(".m6QErb.XiKgde")?.childNodes;
+    const albumSectionSelector = getElementByTreePath(DOM_TREE.locationContainer, 'albumSection');
+    const album = await waitForElement(albumSectionSelector);
+    const imageChildNodes = album.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > image')).childNodes;
 
     let images = [];
     for (let i = 0; i < imageChildNodes.length; i++) {
-      let image = imageChildNodes[i]?.querySelector(".U39Pmb");
+      let image = imageChildNodes[i]?.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > image > url'));
       const imageUrl = regexImageUrl(image);
       if (imageUrl) {
         images.push(imageUrl);
@@ -214,64 +256,61 @@ async function extractInformation(elementConstant) {
   }
 
   function getTotalReview() {
-    const totalReviewText = document.querySelector(
-      ".PPCwl .fontBodySmall"
-    )?.innerText;
+    const totalReviewText = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > reviewTab > totalReview').innerText;
     const regex = /\d+/;
     const match = totalReviewText.match(regex);
     return match ? match[0] : 0;
   }
 
-  async function sortByLatestComment() {
-    // filter latest review
-    const sortByElement = document.querySelector(
-      'div[class="m6QErb Hk4XGb XiKgde tLjsW "] button'
-    );
+  async function sortByNewestComment() {
+    // find sort by menu element to trigger click
+    const sortByElement = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > reviewTab > sortBy');
     sortByElement.click();
 
-    // dropdown sort by
-    await waitForElement(".fontBodyLarge.yu5kgd.vij30.kA9KIf");
+    // wait for sort by option is visible
+    const sortByMenu = getElementByTreePath(DOM_TREE, 'appContainer > sortByMenu');
+    await waitForElement(sortByMenu);
 
-    const sortByLatestOption = document
-      .querySelector(".fontBodyLarge.yu5kgd.vij30.kA9KIf")
-      ?.querySelector('div[data-index="1"]');
+    // select the newest option
+    const sortByLatestOption = DOMQuerySelector(DOM_TREE.appContainer, 'sortByMenu > newest', true);
     sortByLatestOption.click();
   }
 
+  function getLoadMoreElementByReviewId(dataReviewId){
+    return `${getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode > review')} button[data-review-id="${dataReviewId}"]`;
+  }
+
   async function expandComment(commentElement) {
-    const expanReviewElement = commentElement?.querySelector(
-      "button.w8nwRe.kyuRq"
-    );
+    const expanReviewElement = commentElement?.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode > review > buttonLoadMore'));
     if (expanReviewElement) {
       expanReviewElement.click();
       const dataReviewId = expanReviewElement.getAttribute("data-review-id");
-      await waitForElementInvisible(
-        ".MyEned button[data-review-id=" + dataReviewId + "]"
-      );
+      await waitForElementInvisible(getLoadMoreElementByReviewId(dataReviewId));
     }
   }
 
   async function getReviews() {
     // wait for the tab to be activate
-    const reviewTab = document.querySelector('button[data-tab-index="1"]');
-    if (!reviewTab) return;
+    const buttonReviewTab = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > tab > buttonReviewTab');
+    if (!buttonReviewTab) return;
 
-    const reviewAreaElement = ".m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde";
-    if (!reviewTab.classList.contains("G7m0Af")) {
-      await switchToTab(tabConstant.review, reviewAreaElement);
+    const mainSectionSelector = getElementByTreePath(DOM_TREE, 'locationContainer > mainSection', true);
+    const tabActive = getElementByTreePath(DOM_TREE, 'locationContainer > mainSection > tab > activeClass');
+    if (!buttonReviewTab.classList.contains(tabActive)) {
+      await switchToTab(tabConstant.review, mainSectionSelector);
     }
 
-    // sort comment by latest
-    await sortByLatestComment();
+    // sort comment by newest comment
+    await sortByNewestComment();
 
     // wait for review list are display
-    const reviewListElement = 'div[class="m6QErb XiKgde "]';
-    await waitForElement(reviewListElement, true);
+    const reviewTab = getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab', true);
+    await waitForElement(reviewTab, true);
 
     let reviews = [];
-    const reviewArea = document.querySelector(reviewAreaElement);
-    const reviewList = reviewArea?.querySelector(reviewListElement);
-    var reviewNodes = reviewList.querySelectorAll(".fontBodyMedium");
+    const mainSection = querySelector(mainSectionSelector);
+    var reviewNodes = mainSection?.querySelector(reviewTab)
+                                  .querySelectorAll(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode'));
 
     const limit = getTotalReview();
 
@@ -281,37 +320,34 @@ async function extractInformation(elementConstant) {
       // in case element not available => try to load more element
       if (!reviewNode) {
         reviewNodes = await loadMoreReviewNodes(
-          reviewArea,
-          reviewListElement,
+          mainSection,
+          reviewTab,
           limit
         );
         reviewNode = reviewNodes[i];
       }
 
-      const user =
-        reviewNode.querySelector(".d4r55")?.innerText || "Unknown User";
-      const rating =
-        reviewNode
-          .querySelector('span[class*="kvMYJc"]')
-          ?.querySelectorAll(".elGi1d")?.length || "0";
-
+      const dataReviewId = reviewNode.getAttribute('data-review-id');
+      const user = reviewNode.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode > user'))?.innerText;
+      const rating = reviewNode.querySelectorAll(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime > rating'))?.length;
+      
       // There are 2 type of comment structure
       // 1 - display inside of div has class .MyEned
       // 2 - display with child nodes in a div without any id or class
-      let commentElement = reviewNode.querySelector(".MyEned");
+      let commentElement = reviewNode.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode > review'));
       if (!commentElement) {
-        commentElement = reviewNode.querySelector(".DU9Pgb").nextSibling;
+        commentElement = reviewNode.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime')).nextSibling;
       }
 
       // expan comment if too log
       await expandComment(commentElement);
 
       const comment = commentElement?.innerText || "";
-      const commentTime = reviewNode.querySelector(".rsqaWe")?.innerText || "";
+      const commentTime = reviewNode.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime > commentTime'))?.innerText || "";
 
       const images = extractImages(reviewNode);
 
-      reviews.push({ user, rating, comment, commentTime, images });
+      reviews.push({dataReviewId, user, rating, comment, commentTime, images });
     }
 
     return reviews;
@@ -342,7 +378,7 @@ async function extractInformation(elementConstant) {
     });
 
     // Update review nodes
-    reviewNodes = reviewList.querySelectorAll(".fontBodyMedium");
+    reviewNodes = reviewList.querySelectorAll(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode'));
 
     // If not enough review nodes are loaded, call the function recursively
     if (reviewNodes.length < numberOfComment) {
@@ -391,7 +427,7 @@ async function extractInformation(elementConstant) {
   }
 
   function extractImages(el) {
-    const imageElements = el.querySelector(".KtCyie")?.childNodes;
+    const imageElements = el.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode > image'))?.childNodes;
     const images = [];
     if (imageElements && imageElements.length > 0) {
       for (let i = 0; i < imageElements.length; i++) {
