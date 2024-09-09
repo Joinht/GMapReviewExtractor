@@ -1,4 +1,21 @@
 export const DOM_TREE = {
+    searchResultContainer: {
+        selector: 'div[class="k7jAl miFGmb lJ3Kh PLbyfe"]',
+        children: {
+            resultSection: {
+                selector: 'div[class="m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd "]',
+                children: {
+                    resultItem: {
+                        selector: 'div[class*="Nv2PK"]',
+                        children: {
+                            link: {selector: 'a[class="hfpxzc"]'}
+                        }
+                    },
+                    loading: {selector: 'div[class="qjESne veYFef"]'}
+                }
+            }
+        }
+    },
     appContainer: {
         selector: "div#app-container",
         children: {
@@ -16,6 +33,7 @@ export const DOM_TREE = {
             mainSection: {
                 selector: 'div[class="m6QErb DxyBCb kA9KIf dS8AEf XiKgde "]', 
                 children: {
+                    buttonClose: {selector: 'button[class="VfPpkd-icon-LgbsSe yHy1rc eT1oJ mN1ivc"]'},
                     location: {
                         name: {selector: 'h1[class="DUwDvf lfPIob"]'},
                         category: {selector: 'button[class="DkEaL "]'},
@@ -40,7 +58,18 @@ export const DOM_TREE = {
                             },
                             website: {selector: 'div[class="RcCsl fVHpi w4vB1d NOE9ve M0S7ae AG25L "] .rogA2c.ITvuef'},
                             phone: {selector: '[data-item-id^="phone:tel:"] .rogA2c .Io6YTe'},
-                            thumbnail: {selector: 'div[class="RZ66Rb FgCUCc"] > button > img'}
+                            thumbnail: {
+                                selector: 'div[class="ZKCDEc"]',
+                                children: {
+                                    imageButton: {
+                                        selector: 'div[class="RZ66Rb FgCUCc"] > button',
+                                        children: {
+                                            link: {selector: 'div[class="RZ66Rb FgCUCc"] > button > img'}
+                                        }
+                                    },
+                                    totalImage: {selector: 'button[class="Dx2nRe"]'}
+                                }
+                            }
                         }
                     },
                     reviewTab: {

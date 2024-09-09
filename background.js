@@ -74,6 +74,16 @@ async function extractInformation(DOM_TREE) {
     return null;
   }
 
+  function checkElement(selector){
+    const element = document.querySelector(selector);
+    if(!element){
+      console.warn(`Element ${selector} not found`)
+      return false;
+    }
+
+    return true;
+  }
+
   
   // Utility function to wait for an element to appear
   function waitForElement(
@@ -185,7 +195,12 @@ async function extractInformation(DOM_TREE) {
     return { street, ward, district, city, country, latitude, longitude };
   }
 
+  function hasAlbumImage(){
+     return checkElement(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > generalTab > thumbnail > totalImage'));
+  }
+
   async function generalInformation() {
+    debugger;
     // wait for the tab to be activate
     const generalElement = getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > location > name');
     if (!document.querySelector(generalElement)) {
@@ -214,15 +229,22 @@ async function extractInformation(DOM_TREE) {
     const webSite = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > generalTab > website')?.innerText;
     const phoneNumber = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > generalTab > phone')?.innerText;
 
-    var albumImages = await getAlbumImage();
-
-    // back to previous tab after get all of image in album
-    const topBarAlbum = DOMQuerySelector(DOM_TREE.locationContainer, 'albumSection > topBarAlbum');
-    if(topBarAlbum){
-      topBarAlbum.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbum > escapeAlbum')).click();
-      await waitForElementInvisible('div[class="google-symbols G47vBd"]');
+    debugger;
+    let albumImages = [];
+    if(hasAlbumImage()){
+       albumImages = await getAlbumImage();
+      // back to previous tab after get all of image in album
+      const topBarAlbum = DOMQuerySelector(DOM_TREE.locationContainer, 'albumSection > topBarAlbum');
+      if(topBarAlbum){
+        topBarAlbum.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbum > escapeAlbum')).click();
+        await waitForElementInvisible('div[class="google-symbols G47vBd"]');
+      }
+    }else{
+      const thumbnailSelector = querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > generalTab > thumbnail > imageButton > link'));
+      const imageUrl = thumbnailSelector.getAttribute('src');
+      albumImages.push(imageUrl);
     }
-
+   
     return {
       currentUrl,
       location,
@@ -237,7 +259,7 @@ async function extractInformation(DOM_TREE) {
   }
 
   async function getAlbumImage() {
-    const thumbnailSelector = querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > generalTab > thumbnail'));
+    const thumbnailSelector = querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > generalTab > thumbnail > imageButton'));
     if(!thumbnailSelector)
       return [];
 
@@ -398,7 +420,6 @@ async function extractInformation(DOM_TREE) {
   }
 
   async function getIntroduction() {
-    debugger;
     const buttonIntroductionTab = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > tab > buttonIntroductionTab');
     if (!buttonIntroductionTab) return "";
 
@@ -444,7 +465,7 @@ async function extractInformation(DOM_TREE) {
     return images;
   }
 
-  async function main() {
+  async function extract(){
     const {
       currentUrl,
       location,
@@ -474,7 +495,57 @@ async function extractInformation(DOM_TREE) {
     };
   }
 
-  const result = await main();
-  console.log(result);
-  return result;
+  async function lazyLoadResult(previousScrollHeight) {
+    // load all search results
+    const resultSection = DOMQuerySelector(DOM_TREE, 'searchResultContainer > resultSection', true);
+  
+    // Scroll to the bottom of the result area
+    resultSection.scrollTop = resultSection.scrollHeight;
+  
+    // Wait for the scroll and lazy load to finish using requestAnimationFrame
+    await new Promise((resolve) => {
+      function checkScrollHeight() {
+        if (resultSection.scrollHeight === previousScrollHeight) {
+          resolve(previousScrollHeight);
+        } else {
+          previousScrollHeight = resultSection.scrollHeight;
+          requestAnimationFrame(checkScrollHeight); // Check again in the next frame
+        }
+      }
+      requestAnimationFrame(checkScrollHeight); // Initial call
+    });
+  
+    // If scroll height hasn't changed, stop recursion; otherwise, keep loading more results
+    if (previousScrollHeight !== resultSection.scrollHeight) {
+      await lazyLoadResult(previousScrollHeight); // Recursively load more items
+    }
+  }
+
+  async function main() {
+    // search result
+    debugger;
+    const resultContainer = DOMQuerySelector(DOM_TREE, 'searchResultContainer');
+    if(resultContainer){
+        let searchResults = DOMQuerySelectorAll(DOM_TREE, 'searchResultContainer > resultSection > resultItem', true);
+        if(searchResults.length > 0){
+          // Get the initial scrollHeight of the result container
+            const previousScrollHeight = 0;
+            await lazyLoadResult(previousScrollHeight);
+
+            // get all search result
+            debugger;
+            searchResults = DOMQuerySelectorAll(DOM_TREE, 'searchResultContainer > resultSection > resultItem', true);
+            for (let index = 0; index < searchResults.length; index++) {
+              const result = searchResults[index];
+              result.querySelector(getElementByTreePath(DOM_TREE.searchResultContainer, 'resultSection > resultItem > link')).click();
+              await waitForElement(getElementByTreePath(DOM_TREE, "locationContainer"));
+              var extractResult = await extract();
+              console.log(extractResult);
+              
+            }
+        }
+    }
+  }
+
+  await main();
 }
