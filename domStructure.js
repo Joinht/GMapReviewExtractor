@@ -3,7 +3,7 @@ export const DOM_TREE = {
         selector: 'div[class="k7jAl miFGmb lJ3Kh PLbyfe"]',
         children: {
             resultSection: {
-                selector: 'div[class="m6QErb DxyBCb kA9KIf dS8AEf XiKgde ecceSd "]',
+                selector: 'div.m6QErb.DxyBCb.kA9KIf.dS8AEf.XiKgde.ecceSd[role="feed"]',
                 children: {
                     resultItem: {
                         selector: 'div[class*="Nv2PK"]',
