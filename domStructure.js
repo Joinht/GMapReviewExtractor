@@ -109,6 +109,11 @@ export const DOM_TREE = {
                             escapeAlbum: {selector: 'button[class="iPpe6d"]'}
                         }
                     },
+                    topBarAlbumSingle: {selector: '#omnibox-singlebox',
+                        children: {
+                            escapeAlbum: {selector: 'button[class="hYBOP FeXq4d "]'}
+                        }
+                    },
                     image: {selector: 'div[class="m6QErb XiKgde "]',
                         children: {
                             url: {selector: 'div[class="U39Pmb"]'}

@@ -56,7 +56,12 @@ async function extractInformation(DOM_TREE) {
   }
 
   function querySelector(selector){
-    return document.querySelector(selector);
+    const element = document.querySelector(selector);
+    if(!element){
+      console.error(`Selector ${selector} not found`);
+    }
+
+    return element;
   }
 
 
@@ -86,6 +91,26 @@ async function extractInformation(DOM_TREE) {
     return true;
   }
 
+  async function lazyLoadData(selector) {
+    return new Promise((resolve, reject) => {
+      const scrollableElement = querySelector(selector);
+      let previousHeight = 0;
+      const interval = setInterval(() => {
+        scrollableElement.scrollTop = scrollableElement.scrollHeight;
+    
+        const currentHeight = scrollableElement.scrollHeight;
+        if (currentHeight === previousHeight) {
+          clearInterval(interval);
+          // after lazy load completed scroll to top of element
+          scrollableElement.scrollTo(0, 0);
+          resolve();
+        } else {
+          // Update the previous height for the next comparison
+          previousHeight = currentHeight;
+        }
+      }, 500);
+    });
+  }
   
   // Utility function to wait for an element to appear
   function waitForElement(
@@ -108,6 +133,7 @@ async function extractInformation(DOM_TREE) {
             resolve(element);
           } else if (Date.now() - startTime > timeout) {
             clearInterval(checkInterval);
+            console.error(`Timeout: Element ${selector} not found within ${timeout}ms`);
             reject(
               `Timeout: Element ${selector} not found within ${timeout}ms`
             );
@@ -126,7 +152,7 @@ async function extractInformation(DOM_TREE) {
       const startTime = Date.now();
 
       const checkInterval = setInterval(() => {
-        const element = document.querySelector(selector);
+        const element = querySelector(selector);
         // check the condition to determine that element already displayed
         if (!element) {
           clearInterval(checkInterval);
@@ -238,9 +264,10 @@ async function extractInformation(DOM_TREE) {
     if(hasAlbumImage()){
        albumImages = await getAlbumImage();
       // back to previous tab after get all of image in album
-      const topBarAlbum = DOMQuerySelector(DOM_TREE.locationContainer, 'albumSection > topBarAlbum');
+      const topBarAlbum = querySelector(getTopbarSelector());
       if(topBarAlbum){
-        topBarAlbum.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbum > escapeAlbum')).click();
+        const escapeSelector = getEscapeAlbumSelector();
+        topBarAlbum.querySelector(escapeSelector).click();
         await waitForElementInvisible('div[class="google-symbols G47vBd"]');
       }
     }else{
@@ -264,13 +291,30 @@ async function extractInformation(DOM_TREE) {
     };
   }
 
+  function getTopbarSelector(){
+    if(singleLocation){
+      return getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbumSingle');
+    }
+
+    return getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbum');
+  }
+
+  function getEscapeAlbumSelector(){
+    if(singleLocation){
+      return getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbumSingle > escapeAlbum');
+    }
+
+    return getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbum > escapeAlbum');
+  }
+
+
   async function getAlbumImage() {
     const thumbnailSelector = querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > generalTab > thumbnail > imageButton'));
     if(!thumbnailSelector)
       return [];
 
     thumbnailSelector.click();
-    await waitForElement(getElementByTreePath(DOM_TREE.locationContainer, 'albumSection > topBarAlbum'));
+    await waitForElement(getTopbarSelector());
 
     const albumSectionSelector = getElementByTreePath(DOM_TREE.locationContainer, 'albumSection');
     const album = await waitForElement(albumSectionSelector);
@@ -288,12 +332,12 @@ async function extractInformation(DOM_TREE) {
     return images;
   }
 
-  function getTotalReview() {
-    const totalReviewText = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > reviewTab > totalReview').innerText;
-    const regex = /\d+/;
-    const match = totalReviewText.match(regex);
-    return match ? match[0] : 0;
-  }
+  // function getTotalReview() {
+  //   const totalReviewText = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > reviewTab > totalReview').innerText;
+  //   const regex = /\d+/;
+  //   const match = totalReviewText.match(regex);
+  //   return match ? match[0] : 0;
+  // }
 
   async function sortByNewestComment() {
     // find sort by menu element to trigger click
@@ -345,24 +389,14 @@ async function extractInformation(DOM_TREE) {
 
     let reviews = [];
     const mainSection = querySelector(mainSectionSelector);
+
+    await lazyLoadData(mainSectionSelector);
+
     var reviewNodes = mainSection?.querySelector(reviewTab)
                                   .querySelectorAll(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode'));
 
-    const limit = getTotalReview();
-
-    for (let i = 0; i < limit; i++) {
-      let reviewNode = reviewNodes[i];
-
-      // in case element not available => try to load more element
-      if (!reviewNode) {
-        reviewNodes = await loadMoreReviewNodes(
-          mainSection,
-          reviewTab,
-          limit
-        );
-        reviewNode = reviewNodes[i];
-      }
-
+    for (let i = 0; i < reviewNodes.length; i++) {
+      const reviewNode = reviewNodes[i];
       const dataReviewId = reviewNode.getAttribute('data-review-id');
       const user = reviewNode.querySelector(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode > user'))?.innerText;
       const rating = reviewNode.querySelectorAll(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime > rating'))?.length;
@@ -389,44 +423,44 @@ async function extractInformation(DOM_TREE) {
     return reviews;
   }
 
-  async function loadMoreReviewNodes(
-    reviewArea,
-    reviewListElement,
-    numberOfComment
-  ) {
-    const reviewList = reviewArea?.querySelector(reviewListElement);
-    let reviewNodes = [];
-    let previousScrollHeight;
+  // async function loadMoreReviewNodes(
+  //   reviewArea,
+  //   reviewListElement,
+  //   numberOfComment
+  // ) {
+  //   const reviewList = reviewArea?.querySelector(reviewListElement);
+  //   let reviewNodes = [];
+  //   let previousScrollHeight;
 
-    // Scroll to the bottom of the review area
-    reviewArea.scrollTop = reviewArea.scrollHeight;
+  //   // Scroll to the bottom of the review area
+  //   reviewArea.scrollTop = reviewArea.scrollHeight;
 
-    // Wait for the scroll and lazy load to finish
-    await new Promise((resolve) => {
-      const interval = setInterval(() => {
-        if (reviewArea.scrollHeight === previousScrollHeight) {
-          clearInterval(interval);
-          resolve();
-        } else {
-          previousScrollHeight = reviewArea.scrollHeight;
-        }
-      }, 500); // Check every 500 milliseconds
-    });
+  //   // Wait for the scroll and lazy load to finish
+  //   await new Promise((resolve) => {
+  //     const interval = setInterval(() => {
+  //       if (reviewArea.scrollHeight === previousScrollHeight) {
+  //         clearInterval(interval);
+  //         resolve();
+  //       } else {
+  //         previousScrollHeight = reviewArea.scrollHeight;
+  //       }
+  //     }, 500); // Check every 500 milliseconds
+  //   });
 
-    // Update review nodes
-    reviewNodes = reviewList.querySelectorAll(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode'));
+  //   // Update review nodes
+  //   reviewNodes = reviewList.querySelectorAll(getElementByTreePath(DOM_TREE.locationContainer, 'mainSection > reviewTab > reviewNode'));
 
-    // If not enough review nodes are loaded, call the function recursively
-    if (reviewNodes.length < numberOfComment) {
-      return loadMoreReviewNodes(
-        reviewArea,
-        reviewListElement,
-        numberOfComment
-      );
-    }
+  //   // If not enough review nodes are loaded, call the function recursively
+  //   if (reviewNodes.length < numberOfComment) {
+  //     return loadMoreReviewNodes(
+  //       reviewArea,
+  //       reviewListElement,
+  //       numberOfComment
+  //     );
+  //   }
 
-    return reviewNodes;
-  }
+  //   return reviewNodes;
+  // }
 
   async function getIntroduction() {
     const buttonIntroductionTab = DOMQuerySelector(DOM_TREE.locationContainer, 'mainSection > tab > buttonIntroductionTab');
@@ -504,41 +538,29 @@ async function extractInformation(DOM_TREE) {
     };
   }
 
-  async function lazyLoadResult(selector) {
-    return new Promise((resolve, reject) => {
-      const scrollableElement = querySelector(selector);
-      let previousHeight = 0;
-      const interval = setInterval(() => {
-        scrollableElement.scrollTop = scrollableElement.scrollHeight;
-    
-        const currentHeight = scrollableElement.scrollHeight;
-        if (currentHeight === previousHeight) {
-          clearInterval(interval);
-          // after lazy load completed scroll to top of element
-          scrollableElement.scrollTo(0, 0);
-          resolve();
-        } else {
-          // Update the previous height for the next comparison
-          previousHeight = currentHeight;
-        }
-      }, 500);
-    });
-  }
+  var singleLocation = false;
 
   async function main() {
     // search result
     const resultContainer = DOMQuerySelector(DOM_TREE, 'searchResultContainer');
     if(resultContainer){
        // lazy load search result
-        await lazyLoadResult(getElementByTreePath(DOM_TREE,'searchResultContainer > resultSection', true));
+        await lazyLoadData(getElementByTreePath(DOM_TREE,'searchResultContainer > resultSection', true));
          // load all search result
         const searchResults = DOMQuerySelectorAll(DOM_TREE, 'searchResultContainer > resultSection > resultItem', true);
+        console.log(`search result count ${searchResults.length}`)
+        debugger;
         for (let index = 0; index < searchResults.length; index++) {
+          console.log(`search result index ${index}`)
           DOMQuerySelectorAll(DOM_TREE.searchResultContainer, 'resultSection > resultItem > link', true)[index].click();
           await waitForElement(getElementByTreePath(DOM_TREE.locationContainer, "mainSection > location > name", true));
           var extractResult = await extract();
           console.log(extractResult);
         }
+    }else{
+      singleLocation = true;
+      var extractResult = await extract();
+      console.log(extractResult);
     }
   }
 
