@@ -4,13 +4,13 @@
 // });
 
 document.getElementById('extractButton').addEventListener('click', () => {
-    // const shouldExtractAllComments = document.getElementById('allcommentsCheckbox').checked;
+    const syncComment = document.getElementById('syncComment').checked;
     // const numberOfComment = shouldExtractAllComments ? null : parseInt(document.getElementById('numberOfComment').value, 10);
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         chrome.runtime.sendMessage({
             action: 'extractInfo',
             tabId: tabs[0].id,
-            // shouldExtractAllComments: true
+            syncComment: syncComment
             // numberOfComment: numberOfComment
         });
     });
