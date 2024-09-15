@@ -11,7 +11,8 @@ export const DOM_TREE = {
                             link: {selector: 'a[class="hfpxzc"]'}
                         }
                     },
-                    loading: {selector: 'div[class="qjESne veYFef"]'}
+                    loading: {selector: 'div[class="qjESne veYFef"]'},
+                    endOfListMessage: {selector: 'span[class="HlvSq"]'}
                 }
             }
         }

@@ -50,6 +50,24 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
       return selector;
   };
 
+  function delay(ms = 500) {
+    return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  async function clickWithDelay(element, config = { beforeClickDelay: 0, afterClickDelay: 0 }){
+    const { beforeClickDelay, afterClickDelay } = config;
+    // Delay before clicking
+    if (beforeClickDelay > 0) {
+      await delay(beforeClickDelay);
+    }
+
+    element.click();
+
+    if (afterClickDelay > 0) {
+        await delay(afterClickDelay);
+    }
+  }
+
   function querySelectorAll(selector){
     return document.querySelectorAll(selector);
   }
@@ -57,7 +75,7 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
   function querySelector(selector){
     const element = document.querySelector(selector);
     if(!element){
-      console.error(`Selector ${selector} not found`);
+      console.warn(`Selector ${selector} not found`);
     }
 
     return element;
@@ -81,33 +99,28 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
   }
 
   function checkElement(selector){
-    const element = querySelector(selector);
-    if(!element){
-      console.warn(`Element ${selector} not found`)
-      return false;
-    }
-
-    return true;
+    return querySelector(selector);
   }
 
-  async function lazyLoadData(selector) {
-    return new Promise((resolve, reject) => {
-      const scrollableElement = querySelector(selector);
+  async function lazyLoadData(selector, lastSelector, intervalMs = 500) {
+    return new Promise((resolve) => {
+      const scrollableElement = document.querySelector(selector);
       let previousHeight = 0;
+  
       const interval = setInterval(() => {
         scrollableElement.scrollTop = scrollableElement.scrollHeight;
-    
         const currentHeight = scrollableElement.scrollHeight;
-        if (currentHeight === previousHeight) {
+  
+        const isDone = lastSelector ? checkElement(lastSelector) : currentHeight === previousHeight;
+        if (isDone) {
           clearInterval(interval);
-          // after lazy load completed scroll to top of element
           scrollableElement.scrollTo(0, 0);
           resolve();
-        } else {
-          // Update the previous height for the next comparison
+        }else{
           previousHeight = currentHeight;
         }
-      }, 500);
+  
+      }, intervalMs);
     });
   }
   
@@ -132,15 +145,13 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
             resolve(element);
           } else if (Date.now() - startTime > timeout) {
             clearInterval(checkInterval);
-            console.error(`Timeout: Element ${selector} not found within ${timeout}ms`);
+            console.warn(`Timeout: Element ${selector} not found within ${timeout}ms`);
             reject(
               `Timeout: Element ${selector} not found within ${timeout}ms`
             );
           }
         } else {
-          if (Date.now() - startTime > waitTime) {
-            resolve();
-          }
+          console.warn(`selector is invalid`);
         }
       }, interval);
     });
@@ -295,8 +306,7 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
     if(!thumbnailSelector)
       return [];
 
-    thumbnailSelector.click();
-
+    await clickWithDelay(thumbnailSelector, {beforeClickDelay: 1000, afterClickDelay: 1000});
     await waitForElement(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'albumSection > topBarAlbum'));
 
     const albumSectionSelector = getElementByTreePath(DOM_STRUCTURE.locationContainer, 'albumSection');
@@ -328,8 +338,7 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
     if(!sortByElement)
       return;
 
-    sortByElement.click();
-
+    await clickWithDelay(sortByElement, {beforeClickDelay: 1000, afterClickDelay: 1000});
     // wait for sort by option is visible
     const sortByMenu = getElementByTreePath(DOM_STRUCTURE, 'appContainer > sortByMenu');
     await waitForElement(sortByMenu);
@@ -379,71 +388,37 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
                                   .querySelectorAll(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode'));
 
     for (let i = 0; i < reviewNodes.length; i++) {
-      const reviewNode = reviewNodes[i];
-      const dataReviewId = reviewNode.getAttribute('data-review-id');
-      const user = reviewNode.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > user'))?.innerText;
-      const rating = reviewNode.querySelectorAll(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime > rating'))?.length;
-      
-      // There are 2 type of comment structure
-      // 1 - display inside of div has class .MyEned
-      // 2 - display with child nodes in a div without any id or class
-      let commentElement = reviewNode.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > review'));
-      if (!commentElement) {
-        commentElement = reviewNode.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime')).nextSibling;
+      try {
+        const reviewNode = reviewNodes[i];
+        reviewNode.scrollIntoView();
+        const dataReviewId = reviewNode.getAttribute('data-review-id');
+        const user = reviewNode.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > user'))?.innerText;
+        const rating = reviewNode.querySelectorAll(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime > rating'))?.length;
+        
+        // There are 2 type of comment structure
+        // 1 - display inside of div has class .MyEned
+        // 2 - display with child nodes in a div without any id or class
+        let commentElement = reviewNode.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > review'));
+        if (!commentElement) {
+          commentElement = reviewNode.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime')).nextSibling;
+        }
+
+        // expan comment if too log
+        await expandComment(commentElement);
+
+        const comment = commentElement?.innerText || "";
+        const commentTime = reviewNode.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime > commentTime'))?.innerText || "";
+
+        const images = extractImages(reviewNode);
+
+        reviews.push({dataReviewId, user, rating, comment, commentTime, images });
+      } catch (error) {
+          console.error(error);
       }
-
-      // expan comment if too log
-      await expandComment(commentElement);
-
-      const comment = commentElement?.innerText || "";
-      const commentTime = reviewNode.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime > commentTime'))?.innerText || "";
-
-      const images = extractImages(reviewNode);
-
-      reviews.push({dataReviewId, user, rating, comment, commentTime, images });
     }
 
     return reviews;
   }
-
-  // async function loadMoreReviewNodes(
-  //   reviewArea,
-  //   reviewListElement,
-  //   numberOfComment
-  // ) {
-  //   const reviewList = reviewArea?.querySelector(reviewListElement);
-  //   let reviewNodes = [];
-  //   let previousScrollHeight;
-
-  //   // Scroll to the bottom of the review area
-  //   reviewArea.scrollTop = reviewArea.scrollHeight;
-
-  //   // Wait for the scroll and lazy load to finish
-  //   await new Promise((resolve) => {
-  //     const interval = setInterval(() => {
-  //       if (reviewArea.scrollHeight === previousScrollHeight) {
-  //         clearInterval(interval);
-  //         resolve();
-  //       } else {
-  //         previousScrollHeight = reviewArea.scrollHeight;
-  //       }
-  //     }, 500); // Check every 500 milliseconds
-  //   });
-
-  //   // Update review nodes
-  //   reviewNodes = reviewList.querySelectorAll(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode'));
-
-  //   // If not enough review nodes are loaded, call the function recursively
-  //   if (reviewNodes.length < numberOfComment) {
-  //     return loadMoreReviewNodes(
-  //       reviewArea,
-  //       reviewListElement,
-  //       numberOfComment
-  //     );
-  //   }
-
-  //   return reviewNodes;
-  // }
 
   async function getIntroduction() {
     const buttonIntroductionTab = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > tab > buttonIntroductionTab');
@@ -529,20 +504,34 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
     if(resultContainer){
       DOM_STRUCTURE = DOM_TREE;
        // lazy load search result
-        await lazyLoadData(getElementByTreePath(DOM_STRUCTURE,'searchResultContainer > resultSection', true));
+        const searchResultSelector = getElementByTreePath(DOM_STRUCTURE,'searchResultContainer > resultSection', true);
+        const endOfListMessageSelect = getElementByTreePath(DOM_STRUCTURE, 'searchResultContainer > resultSection > endOfListMessage', true);
+        await lazyLoadData(searchResultSelector, endOfListMessageSelect);
          // load all search result
         const searchResults = DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem', true);
-        console.log(`search result count ${searchResults.length}`)
+        console.log(searchResults.length);
         for (let index = 0; index < searchResults.length; index++) {
-          console.log(`search result index ${index}`)
-          DOMQuerySelectorAll(DOM_STRUCTURE.searchResultContainer, 'resultSection > resultItem > link', true)[index].click();
+          // TThis is a bit tricky, we need to refresh the DOM in the search results to get the correct index of each result.
+          await lazyLoadData(searchResultSelector, endOfListMessageSelect);
+          console.log(DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem > link', true).length);
+          const node = DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem > link', true)[index];
+          node.scrollIntoView();
+
+          if(!node){
+            console.error(`search item index ${index} not found`);
+            break;
+          }
+
+          node.click();
+          // Wait for the specific element in the next page to load
           await waitForElement(getElementByTreePath(DOM_STRUCTURE.locationContainer, "mainSection > location > name", true));
+
+          // Extract the result after the click and navigation
           var extractResult = await extract();
           console.log(extractResult);
         }
     }else{
       DOM_STRUCTURE = DOM_SINGLE_LOCATION;
-      singleLocation = true;
       var extractResult = await extract();
       console.log(extractResult);
     }
