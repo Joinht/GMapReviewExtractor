@@ -3,7 +3,8 @@
     "name": "Google map comments Extractor",
     "version": "1.0",
     "description": "Extracts comments from Google Maps.",
-    "permissions": ["activeTab", "scripting", "tabs"],
+    "permissions": ["activeTab", "scripting", "tabs", "webNavigation", "nativeMessaging"],
+    "host_permissions": ["https://www.google.com/maps*" ],
     "background": {
       "service_worker": "background.js",
       "type": "module"

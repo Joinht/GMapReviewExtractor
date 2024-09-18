@@ -10,6 +10,37 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
 
     return true;
   }
+
+  if (request.action === "openNewTab") {
+    chrome.tabs.create({ url: request.url }, (newTab) => {
+      const newTabId = newTab.id;
+
+      // Listen for the tab to finish loading
+      chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
+        if (tabId === newTabId && changeInfo.status === 'complete') {
+          // Run extractInformation once the tab is fully loaded
+          chrome.scripting.executeScript({
+            target: { tabId: newTabId },
+            func: extractInformation,
+            args: [DOM_TREE, DOM_SINGLE_LOCATION, request.syncComment],
+          }, (results) => {
+            if (chrome.runtime.lastError) {
+              sendResponse({ status: 'error', message: chrome.runtime.lastError.message });
+            } else {
+              // Send back the results from extractInformation
+              const extractResult = results && results[0] ? results[0].result : null;
+              sendResponse({ status: 'done', data: extractResult });
+            }
+          });
+
+          // Remove the listener to avoid future triggers for the same tab
+          chrome.tabs.onUpdated.removeListener(listener);
+        }
+      });
+    });
+
+    return true;
+  }
 });
 
 async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
@@ -325,13 +356,6 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
     return images;
   }
 
-  // function getTotalReview() {
-  //   const totalReviewText = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > totalReview').innerText;
-  //   const regex = /\d+/;
-  //   const match = totalReviewText.match(regex);
-  //   return match ? match[0] : 0;
-  // }
-
   async function sortByNewestComment() {
     // find sort by menu element to trigger click
     const sortByElement = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > sortBy');
@@ -498,6 +522,18 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
 
   var DOM_STRUCTURE = DOM_TREE;
 
+  function splitIntoBatches(list, batchSize) {
+    let batches = [];
+    for (let i = 0; i < list.length; i += batchSize) {
+        const batch = list.slice(i, i + batchSize).map((item, index) => ({
+            originalIndex: i + index,
+            value: item
+        }));
+        batches.push(batch);
+    }
+    return batches;
+}
+
   async function main() {
     // search result
     const resultContainer = DOMQuerySelector(DOM_TREE, 'searchResultContainer');
@@ -508,34 +544,54 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
         const endOfListMessageSelect = getElementByTreePath(DOM_STRUCTURE, 'searchResultContainer > resultSection > endOfListMessage', true);
         await lazyLoadData(searchResultSelector, endOfListMessageSelect);
          // load all search result
-        const searchResults = DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem', true);
+        const searchResults = Array.from(DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem', true));
         console.log(searchResults.length);
-        for (let index = 0; index < searchResults.length; index++) {
-          // TThis is a bit tricky, we need to refresh the DOM in the search results to get the correct index of each result.
-          await lazyLoadData(searchResultSelector, endOfListMessageSelect);
-          console.log(DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem > link', true).length);
-          const node = DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem > link', true)[index];
-          node.scrollIntoView();
-
-          if(!node){
-            console.error(`search item index ${index} not found`);
-            break;
-          }
-
-          node.click();
-          // Wait for the specific element in the next page to load
-          await waitForElement(getElementByTreePath(DOM_STRUCTURE.locationContainer, "mainSection > location > name", true));
-
-          // Extract the result after the click and navigation
-          var extractResult = await extract();
-          console.log(extractResult);
+        // Process search results in batches of 10
+        const batchSize = 2;
+        const result = splitIntoBatches(searchResults, batchSize);
+        for (let index = 0; index < result.length; index++) {
+          await processBatch(result[index]);
         }
     }else{
       DOM_STRUCTURE = DOM_SINGLE_LOCATION;
       var extractResult = await extract();
       console.log(extractResult);
+      return extractResult;
     }
   }
 
-  await main();
+  var locations = [];
+  async function processBatch(batch) {
+    // Map the batch to an array of promises
+    const promises = batch.map((resultItem) => {
+      const node = DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem > link', true)[resultItem.originalIndex];
+      if (node) {
+        const url = node.getAttribute('href');
+        // Return the promise from openTabAndExtract
+        return openTabAndExtract(url);
+      }
+      // If the node is not found, return a resolved promise or handle it differently
+      return Promise.resolve(null);
+    });
+  
+    // Wait for all tabs in this batch to finish
+    const results = await Promise.all(promises);
+    locations.push(...results);
+  }
+  
+ function openTabAndExtract(url) {
+    return new Promise((resolve, reject) => {
+      // Open new tab
+      chrome.runtime.sendMessage({ action: 'openNewTab', url: url, syncComment: syncComment }, (response) => {
+        if (response.status === 'done') { 
+          resolve(response.data);
+        } else {
+          reject(new Error('Extraction failed'));
+        }
+      });
+    });
+  }
+  
+
+ return await main();
 }
