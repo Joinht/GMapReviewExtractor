@@ -1,11 +1,11 @@
-import { DOM_TREE, DOM_SINGLE_LOCATION } from './domStructure.js';
+import { DOM_STRUCTURE } from './domStructure.js';
 
 chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "extractInfo") {
     chrome.scripting.executeScript({
       target: { tabId: request.tabId },
       func: extractInformation,
-      args: [DOM_TREE, DOM_SINGLE_LOCATION, request.syncComment],
+      args: [DOM_STRUCTURE, request.syncComment],
     });
 
     return true;
@@ -22,7 +22,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
           chrome.scripting.executeScript({
             target: { tabId: newTabId },
             func: extractInformation,
-            args: [DOM_TREE, DOM_SINGLE_LOCATION, request.syncComment],
+            args: [DOM_STRUCTURE, request.syncComment],
           }, (results) => {
             if (chrome.runtime.lastError) {
               sendResponse({ status: 'error', message: chrome.runtime.lastError.message });
@@ -43,7 +43,7 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   }
 });
 
-async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
+async function extractInformation(DOM_STRUCTURE, syncComment) {
   const tabConstant = {
     general: 0,
     review: 1,
@@ -520,7 +520,6 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
     };
   }
 
-  var DOM_STRUCTURE = DOM_TREE;
 
   function splitIntoBatches(list, batchSize) {
     let batches = [];
@@ -536,16 +535,15 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
 
   async function main() {
     // search result
-    const resultContainer = DOMQuerySelector(DOM_TREE, 'searchResultContainer');
+    const resultContainer = DOMQuerySelector(DOM_STRUCTURE, 'searchResultContainer');
     if(resultContainer){
-      DOM_STRUCTURE = DOM_TREE;
        // lazy load search result
         const searchResultSelector = getElementByTreePath(DOM_STRUCTURE,'searchResultContainer > resultSection', true);
         const endOfListMessageSelect = getElementByTreePath(DOM_STRUCTURE, 'searchResultContainer > resultSection > endOfListMessage', true);
         await lazyLoadData(searchResultSelector, endOfListMessageSelect);
          // load all search result
         const searchResults = Array.from(DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem', true));
-        console.log(searchResults.length);
+        console.log('total location: ',searchResults.length);
         // Process search results in batches of 10
         const batchSize = 2;
         const result = splitIntoBatches(searchResults, batchSize);
@@ -553,7 +551,6 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
           await processBatch(result[index]);
         }
     }else{
-      DOM_STRUCTURE = DOM_SINGLE_LOCATION;
       var extractResult = await extract();
       console.log(extractResult);
       return extractResult;
@@ -577,6 +574,7 @@ async function extractInformation(DOM_TREE, DOM_SINGLE_LOCATION, syncComment) {
     // Wait for all tabs in this batch to finish
     const results = await Promise.all(promises);
     locations.push(...results);
+    console.log('location:', locations);
   }
   
  function openTabAndExtract(url) {
