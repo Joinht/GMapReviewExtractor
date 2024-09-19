@@ -29,6 +29,10 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
               // Send back the results from extractInformation
               const extractResult = results && results[0] ? results[0].result : null;
               sendResponse({ status: 'done', data: extractResult });
+              // after extract information is done, we need to close window to save memory
+              setTimeout(() => {
+                chrome.tabs.remove(newTabId);
+            }, 1000);  
             }
           });
 
@@ -233,12 +237,16 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
     tabLists[index].click();
     await waitForElement(waitForSelector);
   }
+  
+  function regexUrl(url){
+    const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
+    const match = url.match(regex);
+    return match;
+  }
 
   function extractCoordinates(url) {
     // Use a regular expression to match the part of the URL that contains the coordinates
-    const regex = /@(-?\d+\.\d+),(-?\d+\.\d+)/;
-    const match = url.match(regex);
-
+    const match = regexUrl(url);
     if (match) {
       // Extract latitude, longitude from the match groups
       const latitude = match[1];
@@ -291,6 +299,23 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
   function hasThumbail(){
     return checkElement(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > generalTab > thumbnail > imageButton'));
  }
+  
+  async function waitForUrl(timeout = 10000,interval = 500){
+    return new Promise((resolve, reject) => {
+      const startTime = Date.now();
+      const ival = setInterval(() => {
+          const url = window.location.href;
+          // check the condition to determine that element already displayed
+          if (regexUrl(url)) {
+            clearInterval(ival);
+            resolve();
+          } else if (Date.now() - startTime > timeout) {
+            clearInterval(ival);
+            reject();
+          }
+      }, interval);
+    });
+  }
 
   async function generalInformation() {
     // wait for the tab to be activate
@@ -302,6 +327,8 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
     const category = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > location > category').innerText;
     const location = querySelector(generalElement)?.innerText;
     const totalRating = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > location > rating') ?.innerText || 0;
+
+    await waitForUrl();
 
     const currentUrl = window.location.href;
     const address = extractAddress(currentUrl);
