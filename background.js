@@ -14,7 +14,6 @@ chrome.runtime.onMessage.addListener((request, sender, sendResponse) => {
   if (request.action === "openNewTab") {
     chrome.tabs.create({ url: request.url }, (newTab) => {
       const newTabId = newTab.id;
-
       // Listen for the tab to finish loading
       chrome.tabs.onUpdated.addListener(function listener(tabId, changeInfo) {
         if (tabId === newTabId && changeInfo.status === 'complete') {
@@ -144,6 +143,27 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
   
         const isDone = lastSelector ? checkElement(lastSelector) : currentHeight === previousHeight;
         if (isDone) {
+          clearInterval(interval);
+          scrollableElement.scrollTo(0, 0);
+          resolve();
+        }else{
+          previousHeight = currentHeight;
+        }
+  
+      }, intervalMs);
+    });
+  }
+
+  async function lazyLoadAlbumImages(selector, scrollHeight = 500, intervalMs = 500) {
+    return new Promise((resolve) => {
+      const scrollableElement = document.querySelector(selector);
+      let previousHeight = 0;
+  
+      const interval = setInterval(() => {
+        const scrollToHeight = scrollableElement.scrollTop + scrollHeight;
+        scrollableElement.scrollTop = scrollToHeight;
+        const currentHeight = scrollToHeight;
+        if (currentHeight === previousHeight) {
           clearInterval(interval);
           scrollableElement.scrollTo(0, 0);
           resolve();
@@ -342,8 +362,11 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
 
     const albumSectionSelector = getElementByTreePath(DOM_STRUCTURE.locationContainer, 'albumSection');
     const album = await waitForElement(albumSectionSelector);
-    const imageChildNodes = album.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'albumSection > image')).childNodes;
+   
+    await lazyLoadAlbumImages(albumSectionSelector);
 
+    const imageChildNodes = album.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'albumSection > image')).childNodes;
+    
     let images = [];
     for (let i = 0; i < imageChildNodes.length; i++) {
       let image = imageChildNodes[i]?.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'albumSection > image > url'));
@@ -542,11 +565,11 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
         const endOfListMessageSelect = getElementByTreePath(DOM_STRUCTURE, 'searchResultContainer > resultSection > endOfListMessage', true);
         await lazyLoadData(searchResultSelector, endOfListMessageSelect);
          // load all search result
-        const searchResults = Array.from(DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem', true));
-        console.log('total location: ',searchResults.length);
-        // Process search results in batches of 10
-        const batchSize = 2;
-        const result = splitIntoBatches(searchResults, batchSize);
+        const locations = Array.from(DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem', true));
+        console.log('total location: ',locations.length);
+        // Process search results in batches
+        const batchSize = 5;
+        const result = splitIntoBatches(locations, batchSize);
         for (let index = 0; index < result.length; index++) {
           await processBatch(result[index]);
         }
