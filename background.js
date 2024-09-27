@@ -265,13 +265,13 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
     if (!address)
       return { street: "", ward: "", district: "", city: "", country: "" };
 
-    const parts = address.split(",")?.map((part) => part?.trim());
+    const parts = address.split(",")?.map((part) => part?.trim()).reverse();
     // Street Number and Name, Ward, District, City, Country
-    const street = parts[0] || null;
-    const ward = parts[1] || null;
+    const country = parts[0] || null;
+    const city = parts[1] || null;
     const district = parts[2] || null;
-    const city = parts[3] || null;
-    const country = parts[4] || null;
+    const ward = parts[3] || null;
+    const street = parts[4] || null;
 
     return {
       street,
@@ -608,6 +608,7 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
   }
 
   var locations = [];
+  var logs = [];
   async function processBatch(batch) {
     // Map the batch to an array of promises
     const promises = batch.map((resultItem) => {
@@ -615,7 +616,7 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
       if (node) {
         const url = node.getAttribute('href');
         // Return the promise from openTabAndExtract
-        return openTabAndExtract(url);
+        return openNewTabAndExtractLocation(url);
       }
       // If the node is not found, return a resolved promise or handle it differently
       return Promise.resolve(null);
@@ -627,7 +628,7 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
     console.log('location:', locations);
   }
   
- function openTabAndExtract(url) {
+ function openNewTabAndExtractLocation(url) {
     return new Promise((resolve, reject) => {
       // Open new tab
       chrome.runtime.sendMessage({ action: 'openNewTab', url: url, syncComment: syncComment }, (response) => {
@@ -639,7 +640,27 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
       });
     });
   }
-  
+
+  function logMessage(message){
+    const timestamp = new Date().toISOString();
+    const logEntry = `${timestamp} - ${message}`;
+    logs.push(logEntry);
+  }
+
+  // Function to save logs as a file
+  function saveLogsAsFile() {
+    const logContent = logs.join('\n');
+    const blob = new Blob([logContent], { type: 'text/plain' });
+    const link = document.createElement('a');
+    
+    // Set the download attribute with a default file name
+    link.download = `job-log-${new Date().toISOString()}.txt`;
+    link.href = URL.createObjectURL(blob);
+    
+    // Programmatically click the link to trigger download
+    link.click();
+  }
 
  return await main();
+
 }
