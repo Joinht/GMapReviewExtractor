@@ -4,7 +4,7 @@
     "version": "1.0",
     "description": "Extracts comments from Google Maps.",
     "permissions": ["activeTab", "scripting", "tabs", "webNavigation", "nativeMessaging"],
-    "host_permissions": ["https://www.google.com/maps*" ],
+    "host_permissions": ["https://www.google.com/maps*", "https://9525-116-96-30-59.ngrok-free.app/*" ],
     "background": {
       "service_worker": "background.js",
       "type": "module"

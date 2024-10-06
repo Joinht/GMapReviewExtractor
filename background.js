@@ -53,6 +53,13 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
     introduce: 2,
   };
 
+  const base_url = "https://9525-116-96-30-59.ngrok-free.app";
+  const endpoint ={
+    location: {
+      add: "/api/location/add"
+    }
+  }
+
   function getElementByTreePath (tree, path, pathFromRoot = false) {
       let currentNode = tree;
       if(!path)
@@ -263,22 +270,21 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
 
   function extractAddressDetails(address) {
     if (!address)
-      return { street: "", ward: "", district: "", city: "", country: "" };
+      return { street: "", ward: "", district: "", city: "", country: "Việt nam" };
 
     const parts = address.split(",")?.map((part) => part?.trim()).reverse();
-    // Street Number and Name, Ward, District, City, Country
-    const country = parts[0] || null;
-    const city = parts[1] || null;
-    const district = parts[2] || null;
-    const ward = parts[3] || null;
-    const street = parts[4] || null;
+
+    const city = parts[0] || null;
+    const district = parts[1] || null;
+    const ward = parts[2] || null;
+    const street = parts[3] || null;
 
     return {
       street,
       ward,
       district,
       city,
-      country,
+      country: "Việt Nam",
     };
   }
 
@@ -326,31 +332,31 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
 
     const category = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > location > category').innerText;
     const location = querySelector(generalElement)?.innerText;
-    const totalRating = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > location > rating') ?.innerText || 0;
+    const total_rating = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > location > rating') ?.innerText || 0;
 
     await waitForUrl();
 
-    const currentUrl = window.location.href;
-    const address = extractAddress(currentUrl);
+    const current_url = window.location.href;
+    const address = extractAddress(current_url);
 
     // Select all rows in the table that contains the opening hours information
 
     const openingHoursRows = DOMQuerySelectorAll(DOM_STRUCTURE.locationContainer, 'mainSection > generalTab > openinghours');
 
-    let openingHours = [];
+    let opening_hours = [];
 
     openingHoursRows.forEach((row) => {
       const day = row.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > generalTab > openinghours > day'))?.innerText || "";
       const hours = row.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > generalTab > openinghours > hours'))?.innerText || "";
-      openingHours.push({ day, hours });
+      opening_hours.push({ day, hours });
     });
 
-    const webSite = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > generalTab > website')?.innerText;
-    const phoneNumber = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > generalTab > phone')?.innerText;
+    const website = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > generalTab > website')?.innerText;
+    const phone_number = DOMQuerySelector(DOM_STRUCTURE.locationContainer, 'mainSection > generalTab > phone')?.innerText;
 
-    let albumImages = [];
+    let album_images = [];
     if(hasAlbumImage()){
-       albumImages = await getAlbumImage();
+       album_images = await getAlbumImage();
       // back to previous tab after get all of image in album
       const topBarAlbum = querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'albumSection > topBarAlbum'));
       if(topBarAlbum){
@@ -362,20 +368,20 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
       if(hasThumbail()){
         const thumbnailSelector = querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > generalTab > thumbnail > imageButton > link'));
         const imageUrl = thumbnailSelector.getAttribute('src');
-        albumImages.push(imageUrl);
+        album_images.push(imageUrl);
       }
     }
    
     return {
-      currentUrl,
+      current_url,
       location,
       category, 
-      albumImages,
-      totalRating,
+      album_images,
+      total_rating,
       address,
-      openingHours,
-      webSite,
-      phoneNumber,
+      opening_hours,
+      website,
+      phone_number,
     };
   }
 
@@ -465,7 +471,7 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
       try {
         const reviewNode = reviewNodes[i];
         reviewNode.scrollIntoView();
-        const dataReviewId = reviewNode.getAttribute('data-review-id');
+        const data_review_id = reviewNode.getAttribute('data-review-id');
         const user = reviewNode.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > user'))?.innerText;
         const rating = reviewNode.querySelectorAll(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime > rating'))?.length;
         
@@ -481,11 +487,11 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
         await expandComment(commentElement);
 
         const comment = commentElement?.innerText || "";
-        const commentTime = reviewNode.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime > commentTime'))?.innerText || "";
+        const comment_time = reviewNode.querySelector(getElementByTreePath(DOM_STRUCTURE.locationContainer, 'mainSection > reviewTab > reviewNode > ratingAndCommentTime > commentTime'))?.innerText || "";
 
         const images = extractImages(reviewNode);
 
-        reviews.push({dataReviewId, user, rating, comment, commentTime, images });
+        reviews.push({data_review_id, user, rating, comment, comment_time, images });
       } catch (error) {
           console.error(error);
       }
@@ -542,31 +548,31 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
 
   async function extract(){
     const {
-      currentUrl,
+      current_url,
       location,
       category,
-      albumImages,
-      totalRating,
+      album_images,
+      total_rating,
       address,
-      openingHours,
-      webSite,
-      phoneNumber,
+      opening_hours,
+      website,
+      phone_number,
     } = await generalInformation();
     const reviews = syncComment ? await getReviews() : [];
     const introduction = await getIntroduction();
 
     return {
-      currentUrl,
+      current_url,
       location,
       category,
-      albumImages,
-      totalRating,
+      album_images,
+      total_rating,
       address,
-      openingHours,
-      webSite,
-      phoneNumber,
+      opening_hours,
+      website,
+      phone_number,
       reviews,
-      introduction,
+      introduction
     };
   }
 
@@ -595,17 +601,51 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
         const locations = Array.from(DOMQuerySelectorAll(DOM_STRUCTURE, 'searchResultContainer > resultSection > resultItem', true));
         console.log('total location: ',locations.length);
         // Process search results in batches
-        const batchSize = 5;
+        const batchSize = 1;
         const result = splitIntoBatches(locations, batchSize);
         for (let index = 0; index < result.length; index++) {
           await processBatch(result[index]);
         }
     }else{
       var extractResult = await extract();
+      debugger;
       console.log(extractResult);
+      postLocation(extractResult);
       return extractResult;
     }
   }
+
+  function postLocation(data = {}) {
+    try {
+      fetch(`${base_url}${endpoint.location.add}`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json"
+        },
+        body: JSON.stringify(data)
+      })
+      .then(response => {
+        debugger;
+        if (!response.ok) {
+            console.error('Server error:', response.status, response.statusText);
+            return response.text(); // Return text if the body is not JSON
+        }
+        return response.json();
+      })
+      .then(data => {
+        debugger;
+        resolve({ success: true, dataResponse });
+      })
+      .catch(error => {
+        debugger;
+        resolve({ success: false, error });
+      });
+    } catch (error) {
+      // Handle any errors that occur during the fetch
+      console.error('Fetch error:', error);
+    }
+  }
+
 
   var locations = [];
   var logs = [];
@@ -632,8 +672,31 @@ async function extractInformation(DOM_STRUCTURE, syncComment) {
     return new Promise((resolve, reject) => {
       // Open new tab
       chrome.runtime.sendMessage({ action: 'openNewTab', url: url, syncComment: syncComment }, (response) => {
-        if (response.status === 'done') { 
-          resolve(response.data);
+        if (response.status === 'done') {
+          debugger;
+          var dataResponse = response.data;
+          console.log(JSON.stringify(dataResponse));
+          fetch(`${base_url}${endpoint.location.add}`, {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json"
+            },
+            body: JSON.stringify(dataResponse)
+          })
+          .then(response => {
+            debugger;
+            if (!response.ok) {
+                console.error('Server error:', response.status, response.statusText);
+                return response.text(); // Return text if the body is not JSON
+            }
+            return response.json();
+          })
+          .then(data => {
+            resolve({ success: true, dataResponse });
+          })
+          .catch(error => {
+            resolve({ success: false, error });
+          });
         } else {
           reject(new Error('Extraction failed'));
         }
